@@ -1,0 +1,5 @@
+lz4
+capstone
+fonttools
+nsz
+backports.zstd
