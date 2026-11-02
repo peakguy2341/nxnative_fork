@@ -4,7 +4,7 @@ on: [workflow_dispatch]
 
 jobs:
   build-ios:
-    runs-on: macos-14
+    runs-on: macos-15  # Switched to the modern, open servers
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -14,28 +14,28 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
       - name: Install Toolchains
         run: |
-          brew install xcodegen
-          rustup toolchain install 1.98.1
-          rustup target add aarch64-apple-ios --toolchain 1.98.1
+          brew install xcodegen zstd glslang
+          brew install --cask dotnet-sdk
 
       - name: Install Dependencies
         run: |
-          pip install -r requirements.txt
+          pip install lz4 capstone fonttools nsz backports.zstd
 
       - name: Auto-Download Game File
         run: |
+          mkdir -p roms
           curl -L -o ./roms/nsmbudx.nsp 'https://archive.org'
 
       - name: Build Game Binary
         run: |
-          python3 build.py --game ./roms/nsmbudx.nsp --keys ./roms/prod.keys --platform ios --out ./build/nsmbudx.ipa
+          python3 scripts/build_ipa_from_nsp.py ./roms/nsmbudx.nsp -k ./roms/prod.keys
 
       - name: Upload Finished IPA
         uses: actions/upload-artifact@v4
         with:
           name: NSMBUDX-Native-IPA
-          path: build/nsmbudx.ipa
+          path: build/
