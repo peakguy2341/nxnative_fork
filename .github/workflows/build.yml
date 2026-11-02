@@ -4,26 +4,41 @@ on: [workflow_dispatch]
 
 jobs:
   build-ios:
-    runs-on: macos-latest
+    runs-on: macos-15
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
+      - name: Set up Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
       - name: Install System Tools
         run: |
-          brew install xcodegen zstd glslang uv
+          brew install xcodegen zstd glslang
           brew install --cask dotnet-sdk
+
+      - name: Install Python Dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install lz4 "capstone>=5,<6" fonttools nsz backports.zstd
 
       - name: Auto-Download Game File
         run: |
           mkdir -p roms
           curl -L -o "./roms/Super Mario Bros. Wonder [010015100E50E000][v0].nsp" 'https://archive.org'
 
+      - name: Configure System Keys
+        run: |
+          mkdir -p ~/.switch
+          cp ./roms/prod.keys ~/.switch/prod.keys
+
       - name: Build Game Binary
         run: |
-          uv run scripts/build_ipa_from_nsp.py ./roms -k ./roms/prod.keys --survey-only
+          python3 scripts/build_ipa_from_nsp.py ./roms -k ~/.switch/prod.keys --survey-only
 
       - name: Upload Finished Project
         uses: actions/upload-artifact@v4
