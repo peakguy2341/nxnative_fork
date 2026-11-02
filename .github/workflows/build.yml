@@ -40,12 +40,14 @@ jobs:
           DECRYPT_KEYS: ${{ secrets.SWITCH_KEYS }}
         run: |
           mkdir -p ~/.switch
+          echo "$DECRYPT_KEYS" > ./roms/prod.keys
           echo "$DECRYPT_KEYS" > ./roms/PROD.KEYS
+          echo "$DECRYPT_KEYS" > ~/.switch/prod.keys
           echo "$DECRYPT_KEYS" > ~/.switch/PROD.KEYS
 
       - name: Build Game Binary
         run: |
-          python3 scripts/build_ipa_from_nsp.py ./roms --survey-only
+          python3 scripts/build_ipa_from_nsp.py ./roms -k ./roms/prod.keys --survey-only
 
       - name: Upload Finished Project
         uses: actions/upload-artifact@v4
