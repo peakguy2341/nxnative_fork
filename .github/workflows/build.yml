@@ -16,8 +16,9 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Metal Toolchain
+      - name: Install iOS SDK Component
         run: |
+          sudo xcodebuild -downloadComponent iOS
           sudo xcodebuild -downloadComponent MetalToolchain
 
       - name: Install Toolchains
