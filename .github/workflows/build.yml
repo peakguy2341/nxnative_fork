@@ -4,7 +4,7 @@ on: [workflow_dispatch]
 
 jobs:
   build-ios:
-    runs-on: macos-15
+    runs-on: macos-latest  # Automatically grabs the first free Mac machine available
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
