@@ -35,15 +35,17 @@ jobs:
           mkdir -p roms
           curl -L -o "./roms/Super Mario Bros. Wonder [010015100E50E000][v0].nsp" 'https://archive.org'
 
-      - name: Create Safe Dummy Keys File
+      - name: Inject Secure Keys from Secrets
+        env:
+          DECRYPT_KEYS: ${{ secrets.SWITCH_KEYS }}
         run: |
           mkdir -p ~/.switch
-          touch ./roms/PROD.KEYS
-          touch ~/.switch/PROD.KEYS
+          echo "$DECRYPT_KEYS" > ./roms/PROD.KEYS
+          echo "$DECRYPT_KEYS" > ~/.switch/PROD.KEYS
 
       - name: Build Game Binary
         run: |
-          python3 scripts/build_ipa_from_nsp.py ./roms -k ./roms/PROD.KEYS --survey-only
+          python3 scripts/build_ipa_from_nsp.py ./roms --survey-only
 
       - name: Upload Finished Project
         uses: actions/upload-artifact@v4
