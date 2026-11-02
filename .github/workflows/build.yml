@@ -14,7 +14,7 @@ jobs:
       - name: Set up Python Environment
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12' # Switched to 3.12 to meet the script's requirement
+          python-version: '3.12'
 
       - name: Setup .NET Core SDK
         uses: actions/setup-dotnet@v4
@@ -35,15 +35,15 @@ jobs:
           mkdir -p roms
           curl -L -o "./roms/Super Mario Bros. Wonder [010015100E50E000][v0].nsp" 'https://archive.org'
 
-      - name: Configure System Keys
+      - name: Create Safe Dummy Keys File
         run: |
           mkdir -p ~/.switch
-          cp ./roms/prod.keys ~/.switch/PROD.KEYS || true
-          cp ./roms/prod.keys ./roms/PROD.KEYS || true
+          touch ./roms/PROD.KEYS
+          touch ~/.switch/PROD.KEYS
 
       - name: Build Game Binary
         run: |
-          python3 scripts/build_ipa_from_nsp.py ./roms --survey-only
+          python3 scripts/build_ipa_from_nsp.py ./roms -k ./roms/PROD.KEYS --survey-only
 
       - name: Upload Finished Project
         uses: actions/upload-artifact@v4
