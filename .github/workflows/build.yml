@@ -23,7 +23,7 @@ jobs:
 
       - name: Build Game Binary
         run: |
-          uv run scripts/build_ipa_from_nsp.py ./roms -k ./roms/prod.keys
+          uv run scripts/build_ipa_from_nsp.py ./roms -k ./roms/prod.keys --platform ios
 
       - name: Upload Finished IPA
         uses: actions/upload-artifact@v4
