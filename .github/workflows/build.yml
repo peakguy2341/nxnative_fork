@@ -14,12 +14,12 @@ jobs:
       - name: Set up Python Environment
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12' # Switched to 3.12 to meet the script's requirement
 
       - name: Setup .NET Core SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x' # Bypasses apt-get entirely by pulling directly from Microsoft
+          dotnet-version: '8.0.x'
 
       - name: Install System Utilities
         run: |
