@@ -4,7 +4,7 @@ on: [workflow_dispatch]
 
 jobs:
   build-ios:
-    runs-on: macos-15
+    runs-on: ubuntu-latest  # Switched to the 100% FREE Linux cloud runners
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -16,10 +16,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install System Tools
+      - name: Install Linux Tools
         run: |
-          brew install xcodegen zstd glslang
-          brew install --cask dotnet-sdk
+          sudo apt-get update
+          sudo apt-get install -y zstd glslang-tools dotnet-sdk-8.0
 
       - name: Install Python Dependencies
         run: |
@@ -34,11 +34,12 @@ jobs:
       - name: Configure System Keys
         run: |
           mkdir -p ~/.switch
-          cp ./roms/prod.keys ~/.switch/prod.keys
+          cp ./roms/prod.keys ~/.switch/PROD.KEYS
+          cp ./roms/prod.keys ./roms/PROD.KEYS
 
       - name: Build Game Binary
         run: |
-          python3 scripts/build_ipa_from_nsp.py ./roms -k ~/.switch/prod.keys --survey-only
+          python3 scripts/build_ipa_from_nsp.py ./roms --survey-only
 
       - name: Upload Finished Project
         uses: actions/upload-artifact@v4
