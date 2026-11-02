@@ -1,5 +1,5 @@
 # setup
-name: Build NSMBUDX IPA
+name: Build SMBW IPA
 on: [workflow_dispatch]
 
 jobs:
@@ -19,7 +19,7 @@ jobs:
       - name: Auto-Download Game File
         run: |
           mkdir -p roms
-          curl -L -o ./roms/nsmbudx.nsp 'https://archive.org'
+          curl -L -o ./roms/smbw.nsp 'https://archive.org'
 
       - name: Build Game Binary
         run: |
@@ -28,5 +28,5 @@ jobs:
       - name: Upload Finished IPA
         uses: actions/upload-artifact@v4
         with:
-          name: NSMBUDX-Native-IPA
+          name: SMBW-Native-IPA
           path: roms/*_build/
