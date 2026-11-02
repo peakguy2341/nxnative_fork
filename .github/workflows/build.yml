@@ -16,18 +16,14 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install iOS SDK Component
-        run: |
-          sudo xcodebuild -downloadComponent iOS
-          sudo xcodebuild -downloadComponent MetalToolchain
+      - name: Setup .NET Core SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x' # Adds the exact compiler environment the tool needs
 
-      - name: Install Toolchains
+      - name: Install Tools & Dependencies
         run: |
           brew install xcodegen zstd glslang
-          brew install --cask dotnet-sdk
-
-      - name: Install Dependencies
-        run: |
           pip install lz4 "capstone>=5,<6" fonttools nsz zbic backports.zstd
 
       - name: Auto-Download Game File
