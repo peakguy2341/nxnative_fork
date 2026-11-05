@@ -1,56 +1,155 @@
 # setup
-name: Build SMBW IPA
-on: [workflow_dispatch]
+name: Super Mario Bros. Wonder - Wonder Mobile
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  build-ios:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+  prepare:
+    name: Prepare Wonder Mobile Build
+    runs-on: macos-26
+    timeout-minutes: 180
 
-      - name: Set up Python Environment
+    steps:
+      - name: Checkout nxnative
+        uses: actions/checkout@v4
+
+      - name: Check Mac architecture
+        run: |
+          set -e
+
+          echo "Checking Mac architecture..."
+
+          ARCH=$(uname -m)
+          echo "Architecture: $ARCH"
+
+          if [ "$ARCH" != "arm64" ]; then
+            echo "ERROR: nxnative requires an Apple Silicon Mac."
+            exit 1
+          fi
+
+      - name: Check macOS version
+        run: |
+          set -e
+
+          sw_vers
+
+          VERSION=$(sw_vers -productVersion)
+
+          if [ "$(printf '%s\n' 26.6 "$VERSION" | sort -V | head -n 1)" != "26.6" ]; then
+            echo "ERROR: macOS 26.6 or later is required."
+            exit 1
+          fi
+
+      - name: Select Xcode 27.2
+        run: |
+          set -e
+
+          XCODE=""
+
+          for APP in \
+            /Applications/Xcode-27.2.app \
+            /Applications/Xcode.app; do
+
+            if [ -d "$APP" ]; then
+              VERSION=$("$APP/Contents/Developer/usr/bin/xcodebuild" -version | awk '/Xcode/ {print $2}')
+
+              if [ "$VERSION" = "27.2" ]; then
+                XCODE="$APP"
+                break
+              fi
+            fi
+          done
+
+          if [ -z "$XCODE" ]; then
+            echo "ERROR: Xcode 27.2 was not found."
+            exit 1
+          fi
+
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+
+          xcodebuild -version
+
+      - name: Install Metal Toolchain
+        run: |
+          xcodebuild -downloadComponent MetalToolchain
+
+      - name: Install Homebrew dependencies
+        run: |
+          set -e
+
+          brew install xcodegen zstd glslang
+          brew install --cask dotnet-sdk
+
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
-      - name: Setup .NET Core SDK
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: '8.0.x'
-
-      - name: Install System Utilities
+      - name: Install Python dependencies
         run: |
-          sudo apt-get update && sudo apt-get install -y zstd glslang-tools
+          set -e
 
-      - name: Install Python Dependencies
+          python3 -m venv .venv
+          source .venv/bin/activate
+
+          python -m pip install --upgrade pip
+
+          python -m pip install \
+            lz4 \
+            "capstone>=5,<6" \
+            fonttools \
+            nsz \
+            zbic \
+            "backports.zstd; python_version < '3.14'"
+
+      - name: Verify dependencies
         run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install lz4 "capstone>=5,<6" fonttools nsz backports.zstd
+          set -e
 
-      - name: Auto-Download Game File
+          source .venv/bin/activate
+
+          python --version
+          python -m pip --version
+          xcodebuild -version
+          xcodegen --version
+          zstd --version
+          glslangValidator --version
+          dotnet --version
+
+      - name: Verify nxnative packing script
         run: |
-          mkdir -p roms
-          curl -L -o "./roms/Super Mario Bros. Wonder [010015100E50E000][v0].nsp" 'https://archive.org'
+          set -e
 
-      - name: Inject Secure Keys from Secrets
-        env:
-          DECRYPT_KEYS: ${{ secrets.SWITCH_KEYS }}
+          test -f scripts/build_ipa_from_nsp.py
+
+          source .venv/bin/activate
+
+          python scripts/build_ipa_from_nsp.py --help
+
+          echo "NXNATIVE SCRIPT CHECK PASSED"
+
+      - name: Create build report
+        if: always()
         run: |
-          mkdir -p ~/.switch
-          echo "$DECRYPT_KEYS" > ./roms/prod.keys
-          echo "$DECRYPT_KEYS" > ./roms/PROD.KEYS
-          echo "$DECRYPT_KEYS" > ~/.switch/prod.keys
-          echo "$DECRYPT_KEYS" > ~/.switch/PROD.KEYS
+          {
+            echo "Wonder Mobile Build Report"
+            echo "-------------------------"
+            sw_vers || true
+            uname -m || true
+            xcodebuild -version || true
+            python3 --version || true
+            dotnet --version || true
+          } > wonder-mobile-report.txt
 
-      - name: Build Game Binary
-        run: |
-          python3 scripts/build_ipa_from_nsp.py ./roms -k ./roms/prod.keys --survey-only
-
-      - name: Upload Finished Project
+      - name: Upload build report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: SMBW-Native-Output
-          path: roms/*_survey/
+          name: Wonder-Mobile-Build-Report
+          path: wonder-mobile-report.txt
+          if-no-files-found: ignore
+          retention-days: 7
