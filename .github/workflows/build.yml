@@ -47,33 +47,31 @@ jobs:
         run: |
           set -e
 
-          XCODE=""
+          XCODE="/Applications/Xcode_27.2.app"
 
-          for APP in \
-            /Applications/Xcode-27.2.app \
-            /Applications/Xcode.app; do
-
-            if [ -d "$APP" ]; then
-              VERSION=$("$APP/Contents/Developer/usr/bin/xcodebuild" -version | awk '/Xcode/ {print $2}')
-
-              if [ "$VERSION" = "27.2" ]; then
-                XCODE="$APP"
-                break
-              fi
-            fi
-          done
-
-          if [ -z "$XCODE" ]; then
+          if [ ! -d "$XCODE" ]; then
             echo "ERROR: Xcode 27.2 was not found."
+            echo "Installed Xcode applications:"
+            ls -ld /Applications/Xcode*.app || true
+            exit 1
+          fi
+
+          VERSION=$("$XCODE/Contents/Developer/usr/bin/xcodebuild" -version | awk '/Xcode/ {print $2}')
+
+          if [ "$VERSION" != "27.2" ]; then
+            echo "ERROR: Expected Xcode 27.2, found $VERSION"
             exit 1
           fi
 
           sudo xcode-select -s "$XCODE/Contents/Developer"
 
+          echo "Selected Xcode:"
           xcodebuild -version
 
       - name: Install Metal Toolchain
         run: |
+          set -e
+
           xcodebuild -downloadComponent MetalToolchain
 
       - name: Install Homebrew dependencies
