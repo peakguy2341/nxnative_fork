@@ -1,0 +1,69 @@
+name: Wonder IPA Diagnostics
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: xcode-27
+
+    steps:
+      - name: Download sample IPA artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Wonder-Sample-Unsigned
+          path: ./ipa-artifact
+          run-id: ${{ github.run_id }}
+      
+      - name: Inspect IPA
+        shell: bash
+        run: |
+          set -e
+
+          echo "=== FIND IPA ==="
+          find ./ipa-artifact -type f -name "*.ipa"
+
+          IPA=$(find ./ipa-artifact -type f -name "*.ipa" | head -n 1)
+
+          if [ -z "$IPA" ]; then
+            echo "ERROR: No IPA found"
+            exit 1
+          fi
+
+          echo "=== EXTRACT IPA ==="
+          mkdir extracted
+          unzip -q "$IPA" -d extracted
+
+          APP=$(find extracted/Payload -maxdepth 1 -name "*.app" -type d | head -n 1)
+
+          if [ -z "$APP" ]; then
+            echo "ERROR: App bundle missing"
+            exit 1
+          fi
+
+          echo "=== APP METADATA ==="
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c "Print :MinimumOSVersion" "$APP/Info.plist"
+
+          echo "=== EXECUTABLE ==="
+          EXEC=$(/usr/libexec/PlistBuddy -c "Print :CFBundleExecutable" "$APP/Info.plist")
+          file "$APP/$EXEC"
+
+          echo "=== ARCHITECTURE ==="
+          xcrun lipo -info "$APP/$EXEC" || true
+
+          echo "=== SIGNATURE ==="
+          codesign -dv "$APP" 2>&1 || true
+
+          echo "=== PROVISIONING PROFILE ==="
+          if [ -f "$APP/embedded.mobileprovision" ]; then
+            echo "Provisioning profile exists"
+          else
+            echo "No embedded provisioning profile"
+          fi
+
+          echo "=== APP STRUCTURE ==="
+          find "$APP" -maxdepth 2 -type f
+
+          echo "=== DIAGNOSTICS COMPLETE ==="
