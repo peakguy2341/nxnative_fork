@@ -1,0 +1,107 @@
+name: Wonder Sample IPA Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Sample iOS IPA
+    runs-on: xcode-27
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Create sample app
+        run: |
+          mkdir -p Sources
+
+          cat > Sources/WonderSampleApp.swift <<'EOF'
+          import SwiftUI
+
+          @main
+          struct WonderSampleApp: App {
+              var body: some Scene {
+                  WindowGroup {
+                      VStack(spacing: 16) {
+                          Image(systemName: "rocket.fill")
+                              .font(.system(size: 55))
+                              .foregroundColor(.blue)
+
+                          Text("Wonder Mobile Build Test")
+                              .font(.title2)
+                              .bold()
+
+                          Text("Your GitHub Actions IPA pipeline works!")
+                              .multilineTextAlignment(.center)
+                      }
+                      .padding()
+                  }
+              }
+          }
+          EOF
+
+          cat > project.yml <<'EOF'
+          name: WonderSample
+
+          options:
+            bundleIdPrefix: com.example
+
+          targets:
+            WonderSample:
+              type: application
+              platform: iOS
+              deploymentTarget: "15.0"
+              sources:
+                - Sources
+              settings:
+                base:
+                  PRODUCT_BUNDLE_IDENTIFIER: com.example.wondersample
+                  PRODUCT_NAME: WonderSample
+                  INFOPLIST_KEY_CFBundleDisplayName: "Wonder Sample"
+                  GENERATE_INFOPLIST_FILE: YES
+                  SWIFT_VERSION: "5.0"
+                  TARGETED_DEVICE_FAMILY: "1,2"
+          EOF
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build iOS app
+        run: |
+          xcodebuild \
+            -project WonderSample.xcodeproj \
+            -scheme WonderSample \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package unsigned IPA
+        run: |
+          APP="build/Build/Products/Release-iphoneos/WonderSample.app"
+
+          test -d "$APP"
+
+          mkdir Payload
+          cp -R "$APP" Payload/
+
+          ditto -c -k --sequesterRsrc --keepParent \
+            Payload Wonder-Sample-Unsigned.ipa
+
+          test -s Wonder-Sample-Unsigned.ipa
+
+      - name: Upload sample IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Wonder-Sample-Unsigned-IPA
+          path: Wonder-Sample-Unsigned.ipa
+          retention-days: 7
