@@ -1,4 +1,4 @@
-name: Wonder iOS IPA Build
+name: Wonder IPA Build
 
 on:
   workflow_dispatch:
@@ -24,10 +24,9 @@ jobs:
         run: |
           set -e
 
-          mkdir -p Sources
-          mkdir -p Assets.xcassets/AppIcon.appiconset
+          mkdir -p Sources/Assets.xcassets/AppIcon.appiconset
 
-          cat > Sources/WonderSampleApp.swift <<'EOF'
+          cat > Sources/WonderApp.swift <<'SWIFT'
           import SwiftUI
 
           @main
@@ -35,285 +34,229 @@ jobs:
               var body: some Scene {
                   WindowGroup {
                       ContentView()
+                          .preferredColorScheme(.dark)
                   }
               }
           }
 
           struct ContentView: View {
-              @State private var showCartridge = false
+              @State private var showPreview = false
+
+              private let background = LinearGradient(
+                  colors: [
+                      Color(red: 0.10, green: 0.04, blue: 0.24),
+                      Color(red: 0.23, green: 0.08, blue: 0.43),
+                      Color(red: 0.08, green: 0.04, blue: 0.20)
+                  ],
+                  startPoint: .topLeading,
+                  endPoint: .bottomTrailing
+              )
 
               var body: some View {
                   ZStack {
-                      LinearGradient(
-                          colors: [
-                              Color(red: 0.13, green: 0.06, blue: 0.30),
-                              Color(red: 0.25, green: 0.10, blue: 0.48),
-                              Color(red: 0.10, green: 0.05, blue: 0.24)
-                          ],
-                          startPoint: .topLeading,
-                          endPoint: .bottomTrailing
-                      )
-                      .ignoresSafeArea()
+                      background.ignoresSafeArea()
 
-                      if showCartridge {
-                          cartridgeScreen
+                      if showPreview {
+                          previewScreen
                       } else {
                           welcomeScreen
                       }
                   }
-                  .preferredColorScheme(.dark)
+                  .animation(.easeInOut(duration: 0.25), value: showPreview)
               }
 
               private var welcomeScreen: some View {
-                  VStack(spacing: 20) {
+                  VStack(spacing: 22) {
                       Text("Wonder")
                           .font(.system(size: 38, weight: .bold, design: .rounded))
-                          .foregroundStyle(.white)
+                          .foregroundColor(.white)
 
                       WonderFlower()
                           .frame(width: 190, height: 190)
-                          .padding(.vertical, 8)
+                          .padding(.vertical, 12)
 
                       Text("Welcome to Wonder")
                           .font(.system(size: 27, weight: .bold, design: .rounded))
-                          .foregroundStyle(.white)
-                          .multilineTextAlignment(.center)
+                          .foregroundColor(.white)
 
                       Text("Your adventure starts here.")
                           .font(.system(size: 16, weight: .medium))
-                          .foregroundStyle(.white.opacity(0.75))
+                          .foregroundColor(.white.opacity(0.75))
 
                       Button {
-                          withAnimation(.spring(response: 0.4)) {
-                              showCartridge = true
-                          }
+                          showPreview = true
                       } label: {
                           Text("Get Started!")
-                              .font(.system(size: 18, weight: .bold))
-                              .foregroundStyle(.white)
+                              .font(.system(size: 18, weight: .bold, design: .rounded))
+                              .foregroundColor(.white)
                               .frame(maxWidth: .infinity)
                               .padding(.vertical, 17)
                               .background(
                                   LinearGradient(
                                       colors: [
                                           Color(red: 0.20, green: 0.78, blue: 0.42),
-                                          Color(red: 0.08, green: 0.58, blue: 0.30)
+                                          Color(red: 0.08, green: 0.57, blue: 0.30)
                                       ],
                                       startPoint: .top,
                                       endPoint: .bottom
                                   )
                               )
                               .clipShape(RoundedRectangle(cornerRadius: 18))
-                          }
-                          .padding(.top, 12)
                       }
-                      .padding(.horizontal, 30)
+                      .padding(.top, 18)
                   }
-                  .padding(.horizontal, 22)
+                  .padding(.horizontal, 30)
               }
 
-              private var cartridgeScreen: some View {
-                  VStack(spacing: 22) {
+              private var previewScreen: some View {
+                  VStack(spacing: 24) {
                       HStack {
                           Button {
-                              withAnimation {
-                                  showCartridge = false
-                              }
+                              showPreview = false
                           } label: {
                               Label("Back", systemImage: "chevron.left")
-                                  .font(.system(size: 16, weight: .semibold))
-                                  .foregroundStyle(.white)
+                                  .foregroundColor(.white)
                           }
 
                           Spacer()
+
+                          Text("Wonder")
+                              .font(.system(size: 20, weight: .bold, design: .rounded))
+                              .foregroundColor(.white)
+
+                          Spacer()
+
+                          Image(systemName: "sparkles")
+                              .foregroundColor(.white.opacity(0.8))
                       }
 
                       Spacer()
-
-                      Text("YOUR GAME")
-                          .font(.system(size: 13, weight: .bold))
-                          .tracking(3)
-                          .foregroundStyle(.white.opacity(0.65))
-
-                      VStack(spacing: 15) {
-                          ZStack {
-                              RoundedRectangle(cornerRadius: 22)
-                                  .fill(
-                                      LinearGradient(
-                                          colors: [
-                                              Color(red: 0.15, green: 0.65, blue: 0.90),
-                                              Color(red: 0.42, green: 0.22, blue: 0.78)
-                                          ],
-                                          startPoint: .topLeading,
-                                          endPoint: .bottomTrailing
-                                      )
-                                  )
-
-                              VStack(spacing: 12) {
-                                  Text("SUPER MARIO BROS.")
-                                      .font(.system(size: 19, weight: .black, design: .rounded))
-                                      .foregroundStyle(.white)
-
-                                  Text("WONDER")
-                                      .font(.system(size: 39, weight: .black, design: .rounded))
-                                      .foregroundStyle(.white)
-
-                                  WonderFlower()
-                                      .frame(width: 115, height: 115)
-
-                                  Text("GAME PREVIEW")
-                                      .font(.system(size: 11, weight: .bold))
-                                      .tracking(2)
-                                      .foregroundStyle(.white.opacity(0.85))
-                              }
-                              .padding(22)
-                          }
-                          .frame(height: 330)
-                          .overlay {
-                              RoundedRectangle(cornerRadius: 22)
-                                  .stroke(.white.opacity(0.35), lineWidth: 2)
-                          }
-                          .shadow(color: .black.opacity(0.3), radius: 18, y: 10)
-
-                          Text("Super Mario Bros. Wonder")
-                              .font(.system(size: 22, weight: .bold, design: .rounded))
-                              .foregroundStyle(.white)
-
-                          Text("Visual cartridge preview")
-                              .font(.system(size: 14))
-                              .foregroundStyle(.white.opacity(0.7))
-                      }
-
-                      Spacer()
-
-                      Text("This is a visual prototype, not a playable game.")
-                          .font(.system(size: 11))
-                          .foregroundStyle(.white.opacity(0.55))
-                          .multilineTextAlignment(.center)
-                  }
-                  .padding(24)
-              }
-          }
-
-          struct WonderFlower: View {
-              private let petalColors: [Color] = [
-                  Color(red: 0.30, green: 0.55, blue: 1.0),
-                  Color(red: 0.68, green: 0.32, blue: 0.95),
-                  Color(red: 0.98, green: 0.38, blue: 0.67),
-                  Color(red: 0.32, green: 0.62, blue: 1.0),
-                  Color(red: 0.72, green: 0.35, blue: 0.95),
-                  Color(red: 0.98, green: 0.42, blue: 0.66),
-                  Color(red: 0.34, green: 0.65, blue: 1.0),
-                  Color(red: 0.72, green: 0.34, blue: 0.94)
-              ]
-
-              var body: some View {
-                  GeometryReader { geometry in
-                      let side = min(geometry.size.width, geometry.size.height)
 
                       ZStack {
-                          ForEach(0..<8, id: \.self) { index in
-                              Capsule()
-                                  .fill(
-                                      LinearGradient(
-                                          colors: [
-                                              petalColors[index],
-                                              petalColors[index].opacity(0.75)
-                                          ],
-                                          startPoint: .top,
-                                          endPoint: .bottom
-                                      )
-                                  )
-                                  .frame(width: side * 0.29, height: side * 0.49)
-                                  .offset(y: -side * 0.23)
-                                  .rotationEffect(.degrees(Double(index) * 45))
-                          }
-
-                          Circle()
+                          RoundedRectangle(cornerRadius: 22)
                               .fill(
                                   LinearGradient(
                                       colors: [
-                                          Color(red: 1.0, green: 0.91, blue: 0.28),
-                                          Color(red: 1.0, green: 0.70, blue: 0.12)
+                                          Color(red: 0.28, green: 0.12, blue: 0.55),
+                                          Color(red: 0.08, green: 0.05, blue: 0.22)
                                       ],
                                       startPoint: .topLeading,
                                       endPoint: .bottomTrailing
                                   )
                               )
-                              .frame(width: side * 0.48, height: side * 0.48)
 
-                          HStack(spacing: side * 0.105) {
-                              Circle()
-                                  .fill(Color(red: 0.20, green: 0.12, blue: 0.16))
-                                  .frame(width: side * 0.055)
+                          VStack(spacing: 18) {
+                              WonderFlower()
+                                  .frame(width: 125, height: 125)
 
-                              Circle()
-                                  .fill(Color(red: 0.20, green: 0.12, blue: 0.16))
-                                  .frame(width: side * 0.055)
+                              Text("SUPER MARIO BROS.")
+                                  .font(.system(size: 17, weight: .black, design: .rounded))
+                                  .foregroundColor(.white)
+
+                              Text("WONDER")
+                                  .font(.system(size: 39, weight: .black, design: .rounded))
+                                  .foregroundColor(
+                                      Color(red: 1.0, green: 0.83, blue: 0.25)
+                                  )
+
+                              Text("GAME PREVIEW")
+                                  .font(.system(size: 11, weight: .bold))
+                                  .tracking(3)
+                                  .foregroundColor(.white.opacity(0.7))
                           }
-                          .offset(y: -side * 0.035)
-
-                          FlowerSmile()
-                              .stroke(
-                                  Color(red: 0.20, green: 0.12, blue: 0.16),
-                                  style: StrokeStyle(lineWidth: side * 0.025, lineCap: .round)
-                              )
-                              .frame(width: side * 0.16, height: side * 0.10)
-                              .offset(y: side * 0.09)
+                          .padding(25)
                       }
-                      .frame(width: geometry.size.width, height: geometry.size.height)
+                      .frame(height: 390)
+                      .overlay(
+                          RoundedRectangle(cornerRadius: 22)
+                              .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                      )
+
+                      Text("Super Mario Bros. Wonder")
+                          .font(.system(size: 22, weight: .bold, design: .rounded))
+                          .foregroundColor(.white)
+
+                      Text("Visual cartridge preview")
+                          .font(.system(size: 14))
+                          .foregroundColor(.white.opacity(0.7))
+
+                      Spacer()
                   }
+                  .padding(25)
               }
           }
 
-          struct FlowerSmile: Shape {
-              func path(in rect: CGRect) -> Path {
-                  var path = Path()
-                  path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-                  path.addQuadCurve(
-                      to: CGPoint(x: rect.maxX, y: rect.minY),
-                      control: CGPoint(x: rect.midX, y: rect.maxY)
-                  )
-                  return path
+          struct WonderFlower: View {
+              private let petalColors: [Color] = [
+                  Color(red: 0.92, green: 0.25, blue: 0.72),
+                  Color(red: 0.42, green: 0.37, blue: 0.98),
+                  Color(red: 0.20, green: 0.62, blue: 0.98),
+                  Color(red: 0.82, green: 0.32, blue: 0.83),
+                  Color(red: 0.96, green: 0.42, blue: 0.65),
+                  Color(red: 0.36, green: 0.48, blue: 0.98),
+                  Color(red: 0.70, green: 0.34, blue: 0.92),
+                  Color(red: 0.98, green: 0.34, blue: 0.53)
+              ]
+
+              var body: some View {
+                  ZStack {
+                      ForEach(0..<8, id: \.self) { index in
+                          Ellipse()
+                              .fill(
+                                  LinearGradient(
+                                      colors: [
+                                          petalColors[index],
+                                          petalColors[index].opacity(0.72)
+                                      ],
+                                      startPoint: .top,
+                                      endPoint: .bottom
+                                  )
+                              )
+                              .frame(width: 55, height: 91)
+                              .offset(y: -43)
+                              .rotationEffect(.degrees(Double(index) * 45))
+                      }
+
+                      Circle()
+                          .fill(
+                              LinearGradient(
+                                  colors: [
+                                      Color(red: 1.0, green: 0.91, blue: 0.36),
+                                      Color(red: 1.0, green: 0.69, blue: 0.16)
+                                  ],
+                                  startPoint: .topLeading,
+                                  endPoint: .bottomTrailing
+                              )
+                          )
+                          .frame(width: 83, height: 83)
+
+                      HStack(spacing: 17) {
+                          Capsule()
+                              .fill(Color.black)
+                              .frame(width: 8, height: 19)
+
+                          Capsule()
+                              .fill(Color.black)
+                              .frame(width: 8, height: 19)
+                      }
+                      .offset(y: -5)
+
+                      Ellipse()
+                          .fill(Color.black)
+                          .frame(width: 23, height: 9)
+                          .offset(y: 20)
+                  }
+                  .shadow(color: .black.opacity(0.22), radius: 12, y: 7)
               }
           }
-          EOF
+          SWIFT
 
-          cat > project.yml <<'EOF'
-          name: Wonder
-
-          options:
-            bundleIdPrefix: com.wonder
-
-          settings:
-            base:
-              SWIFT_VERSION: "5.0"
-              IPHONEOS_DEPLOYMENT_TARGET: "15.0"
-
-          targets:
-            Wonder:
-              type: application
-              platform: iOS
-              deploymentTarget: "15.0"
-              sources:
-                - Sources
-                - Assets.xcassets
-              settings:
-                base:
-                  PRODUCT_BUNDLE_IDENTIFIER: com.wonder.mobile
-                  PRODUCT_NAME: Wonder
-                  INFOPLIST_KEY_CFBundleDisplayName: Wonder
-                  GENERATE_INFOPLIST_FILE: YES
-                  ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-                  TARGETED_DEVICE_FAMILY: "1,2"
-          EOF
-
-      - name: Generate Wonder app icon
+      - name: Create Wonder Flower icon
         shell: bash
         run: |
           set -e
 
-          cat > make-icon.swift <<'EOF'
+          cat > make-icon.swift <<'SWIFT'
           import AppKit
 
           let size = 1024
@@ -321,60 +264,99 @@ jobs:
 
           image.lockFocus()
 
-          let bounds = NSRect(x: 0, y: 0, width: size, height: size)
+          guard NSGraphicsContext.current != nil else {
+              fatalError("Graphics context unavailable")
+          }
 
-          let background = NSGradient(colors: [
-              NSColor(calibratedRed: 0.12, green: 0.05, blue: 0.30, alpha: 1),
-              NSColor(calibratedRed: 0.32, green: 0.12, blue: 0.58, alpha: 1)
-          ])!
-          background.draw(in: bounds, angle: 45)
+          NSColor(
+              calibratedRed: 0.10,
+              green: 0.04,
+              blue: 0.24,
+              alpha: 1
+          ).setFill()
+
+          NSBezierPath(
+              rect: NSRect(x: 0, y: 0, width: size, height: size)
+          ).fill()
 
           let colors: [NSColor] = [
-              .systemBlue, .systemPurple, .systemPink, .systemBlue,
-              .systemPurple, .systemPink, .systemBlue, .systemPurple
+              NSColor(calibratedRed: 0.92, green: 0.25, blue: 0.72, alpha: 1),
+              NSColor(calibratedRed: 0.42, green: 0.37, blue: 0.98, alpha: 1),
+              NSColor(calibratedRed: 0.20, green: 0.62, blue: 0.98, alpha: 1),
+              NSColor(calibratedRed: 0.82, green: 0.32, blue: 0.83, alpha: 1),
+              NSColor(calibratedRed: 0.96, green: 0.42, blue: 0.65, alpha: 1),
+              NSColor(calibratedRed: 0.36, green: 0.48, blue: 0.98, alpha: 1),
+              NSColor(calibratedRed: 0.70, green: 0.34, blue: 0.92, alpha: 1),
+              NSColor(calibratedRed: 0.98, green: 0.34, blue: 0.53, alpha: 1)
           ]
 
           for index in 0..<8 {
-              let petal = NSBezierPath(ovalIn: NSRect(
-                  x: 392, y: 590, width: 240, height: 390
-              ))
+              let petal = NSBezierPath(
+                  ovalIn: NSRect(
+                      x: 405,
+                      y: 115,
+                      width: 214,
+                      height: 420
+                  )
+              )
 
-              let transform = NSAffineTransform()
-              transform.translateX(by: 512, yBy: 512)
+              var transform = AffineTransform.identity
+              transform.translate(x: 512, y: 512)
               transform.rotate(byDegrees: CGFloat(index) * 45)
-              transform.translateX(by: -512, yBy: -512)
+              transform.translate(x: -512, y: -512)
+
               petal.transform(using: transform)
 
               colors[index].setFill()
               petal.fill()
           }
 
-          NSColor(calibratedRed: 1, green: 0.83, blue: 0.20, alpha: 1).setFill()
-          NSBezierPath(ovalIn: NSRect(x: 320, y: 320, width: 384, height: 384)).fill()
+          NSColor(
+              calibratedRed: 1.0,
+              green: 0.83,
+              blue: 0.25,
+              alpha: 1
+          ).setFill()
 
-          NSColor(calibratedRed: 0.20, green: 0.12, blue: 0.16, alpha: 1).setFill()
-          NSBezierPath(ovalIn: NSRect(x: 420, y: 515, width: 46, height: 68)).fill()
-          NSBezierPath(ovalIn: NSRect(x: 558, y: 515, width: 46, height: 68)).fill()
+          NSBezierPath(
+              ovalIn: NSRect(x: 342, y: 342, width: 340, height: 340)
+          ).fill()
 
-          let smile = NSBezierPath()
-          smile.move(to: NSPoint(x: 445, y: 455))
-          smile.curve(to: NSPoint(x: 579, y: 455),
-                      controlPoint1: NSPoint(x: 475, y: 385),
-                      controlPoint2: NSPoint(x: 549, y: 385))
-          smile.lineWidth = 16
-          smile.lineCapStyle = .round
-          smile.stroke()
+          NSColor.black.setFill()
+
+          NSBezierPath(
+              ovalIn: NSRect(x: 435, y: 455, width: 37, height: 75)
+          ).fill()
+
+          NSBezierPath(
+              ovalIn: NSRect(x: 552, y: 455, width: 37, height: 75)
+          ).fill()
+
+          NSBezierPath(
+              ovalIn: NSRect(x: 469, y: 380, width: 86, height: 37)
+          ).fill()
 
           image.unlockFocus()
 
-          let rep = NSBitmapImageRep(data: image.tiffRepresentation!)!
-          let png = rep.representation(using: .png, properties: [:])!
-          try png.write(to: URL(fileURLWithPath: "Assets.xcassets/AppIcon.appiconset/AppIcon.png"))
-          EOF
+          guard let tiff = image.tiffRepresentation,
+                let bitmap = NSBitmapImageRep(data: tiff),
+                let png = bitmap.representation(
+                    using: .png,
+                    properties: [:]
+                ) else {
+              fatalError("Could not create PNG icon")
+          }
+
+          try png.write(
+              to: URL(fileURLWithPath: "Sources/Assets.xcassets/AppIcon.appiconset/AppIcon.png")
+          )
+
+          print("Wonder icon generated successfully")
+          SWIFT
 
           swift make-icon.swift
 
-          cat > Assets.xcassets/AppIcon.appiconset/Contents.json <<'EOF'
+          cat > Sources/Assets.xcassets/AppIcon.appiconset/Contents.json <<'JSON'
           {
             "images": [
               {
@@ -389,14 +371,39 @@ jobs:
               "version": 1
             }
           }
-          EOF
+          JSON
 
-          test -s Assets.xcassets/AppIcon.appiconset/AppIcon.png
+      - name: Create Xcode project
+        shell: bash
+        run: |
+          cat > project.yml <<'YAML'
+          name: Wonder
 
-      - name: Generate Xcode project
-        run: xcodegen generate
+          options:
+            bundleIdPrefix: com.example
 
-      - name: Build Wonder
+          targets:
+            Wonder:
+              type: application
+              platform: iOS
+              deploymentTarget: "15.0"
+              sources:
+                - Sources
+              settings:
+                base:
+                  PRODUCT_BUNDLE_IDENTIFIER: com.example.wonder
+                  PRODUCT_NAME: Wonder
+                  ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+                  INFOPLIST_KEY_CFBundleDisplayName: Wonder
+                  GENERATE_INFOPLIST_FILE: YES
+                  SWIFT_VERSION: "5.0"
+                  TARGETED_DEVICE_FAMILY: "1,2"
+          YAML
+
+          xcodegen generate
+
+      - name: Build Wonder app
+        shell: bash
         run: |
           set -e
 
@@ -409,7 +416,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
-      - name: Package Wonder IPA
+      - name: Package unsigned Wonder IPA
         shell: bash
         run: |
           set -e
@@ -418,10 +425,6 @@ jobs:
 
           test -d "$APP"
 
-          /usr/libexec/PlistBuddy \
-            -c "Print :CFBundleDisplayName" \
-            "$APP/Info.plist"
-
           mkdir -p Payload
           cp -R "$APP" Payload/
 
@@ -429,12 +432,13 @@ jobs:
             Payload Wonder.ipa
 
           test -s Wonder.ipa
-          unzip -t Wonder.ipa
+
+          echo "IPA created:"
+          ls -lh Wonder.ipa
 
       - name: Upload Wonder IPA
         uses: actions/upload-artifact@v4
         with:
           name: Wonder-Sample-Unsigned-IPA
           path: Wonder.ipa
-          if-no-files-found: error
           retention-days: 7
