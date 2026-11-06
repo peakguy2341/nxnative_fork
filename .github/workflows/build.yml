@@ -1,4 +1,4 @@
-name: Super Mario Bros. Wonder - Wonder Mobile
+name: Wonder Mobile V1 - Liquid Glass
 
 on:
   workflow_dispatch:
@@ -7,146 +7,441 @@ permissions:
   contents: read
 
 jobs:
-  prepare:
-    name: Prepare Wonder Mobile Build
+  build:
+    name: Build Wonder Mobile IPA
     runs-on: xcode-27
-    timeout-minutes: 180
+    timeout-minutes: 60
 
     steps:
-      - name: Checkout nxnative
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check Mac architecture
+      - name: Check build environment
         run: |
           set -e
-
-          echo "Checking Mac architecture..."
-
-          ARCH=$(uname -m)
-          echo "Architecture: $ARCH"
-
-          if [ "$ARCH" != "arm64" ]; then
-            echo "ERROR: nxnative requires an Apple Silicon Mac."
-            exit 1
-          fi
-
-      - name: Check macOS version
-        run: |
-          set -e
-
+          echo "Checking macOS..."
           sw_vers
-
-          VERSION=$(sw_vers -productVersion)
-
-          if [[ "$VERSION" != 27.* ]]; then
-            echo "ERROR: macOS 27 is required."
-            exit 1
-          fi
-
-      - name: Select Xcode 27.2
-        run: |
-          set -e
-
-          XCODE="/Applications/Xcode_27.2.app"
-
-          if [ ! -d "$XCODE" ]; then
-            echo "ERROR: Xcode 27.2 was not found."
-            echo "Installed Xcode applications:"
-            ls -ld /Applications/Xcode*.app || true
-            exit 1
-          fi
-
-          VERSION=$("$XCODE/Contents/Developer/usr/bin/xcodebuild" -version | awk '/Xcode/ {print $2}')
-
-          if [ "$VERSION" != "27.2" ]; then
-            echo "ERROR: Expected Xcode 27.2, found $VERSION"
-            exit 1
-          fi
-
-          sudo xcode-select -s "$XCODE/Contents/Developer"
-
-          echo "Selected Xcode:"
+          echo "Checking architecture..."
+          uname -m
+          echo "Checking Xcode..."
           xcodebuild -version
 
-      - name: Install Metal Toolchain
+      - name: Install XcodeGen
+        run: |
+          set -e
+          brew install xcodegen
+
+      - name: Create Wonder project folders
         run: |
           set -e
 
-          xcodebuild -downloadComponent MetalToolchain
+          mkdir -p Wonder/Assets.xcassets/AppIcon.appiconset
+          mkdir -p package/Payload
 
-      - name: Install Homebrew dependencies
+      - name: Create app icon
         run: |
           set -e
 
-          brew install xcodegen zstd glslang
-          brew install --cask dotnet-sdk
+          python3 -m pip install --user pillow
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+          python3 - <<'PY'
+          from PIL import Image, ImageDraw
+          import math
 
-      - name: Install Python dependencies
-        run: |
-          set -e
+          size = 1024
+          image = Image.new("RGB", (size, size), (31, 18, 65))
+          draw = ImageDraw.Draw(image)
 
-          python3 -m venv .venv
-          source .venv/bin/activate
+          for y in range(size):
+              t = y / size
+              r = int(48 + 30 * t)
+              g = int(27 + 12 * t)
+              b = int(100 + 65 * t)
+              draw.line((0, y, size, y), fill=(r, g, b))
 
-          python -m pip install --upgrade pip
+          cx, cy = 512, 490
 
-          python -m pip install \
-            lz4 \
-            "capstone>=5,<6" \
-            fonttools \
-            nsz \
-            zbic \
-            "backports.zstd; python_version < '3.14'"
+          for radius, color in [
+              (270, (105, 78, 210)),
+              (220, (135, 111, 245)),
+              (160, (185, 165, 255))
+          ]:
+              draw.ellipse(
+                  (cx-radius, cy-radius, cx+radius, cy+radius),
+                  fill=color
+              )
 
-      - name: Verify dependencies
-        run: |
-          set -e
+          petal_color = (255, 255, 255)
+          for i in range(8):
+              angle = math.radians(i * 45)
+              x = cx + math.cos(angle) * 125
+              y = cy + math.sin(angle) * 125
+              draw.ellipse(
+                  (x-85, y-85, x+85, y+85),
+                  fill=petal_color
+              )
 
-          source .venv/bin/activate
+          draw.ellipse(
+              (cx-105, cy-105, cx+105, cy+105),
+              fill=(255, 218, 91)
+          )
 
-          python --version
-          python -m pip --version
-          xcodebuild -version
-          xcodegen --version
-          zstd --version
-          glslangValidator --version
-          dotnet --version
+          image.save(
+              "Wonder/Assets.xcassets/AppIcon.appiconset/AppIcon.png"
+          )
+          PY
 
-      - name: Verify nxnative packing script
-        run: |
-          set -e
-
-          test -f scripts/build_ipa_from_nsp.py
-
-          source .venv/bin/activate
-
-          python scripts/build_ipa_from_nsp.py --help
-
-          echo "NXNATIVE SCRIPT CHECK PASSED"
-
-      - name: Create build report
-        if: always()
-        run: |
+          cat > Wonder/Assets.xcassets/AppIcon.appiconset/Contents.json <<'JSON'
           {
-            echo "Wonder Mobile Build Report"
-            echo "-------------------------"
-            sw_vers || true
-            uname -m || true
-            xcodebuild -version || true
-            python3 --version || true
-            dotnet --version || true
-          } > wonder-mobile-report.txt
+            "images": [
+              {
+                "filename": "AppIcon.png",
+                "idiom": "universal",
+                "platform": "ios",
+                "size": "1024x1024"
+              }
+            ],
+            "info": {
+              "author": "xcode",
+              "version": 1
+            }
+          }
+          JSON
 
-      - name: Upload build report
+      - name: Create Xcode project configuration
+        run: |
+          cat > project.yml <<'YAML'
+          name: Wonder
+
+          options:
+            bundleIdPrefix: com.peakguy2341
+            deploymentTarget:
+              iOS: "18.0"
+
+          settings:
+            base:
+              SWIFT_VERSION: 5.0
+              IPHONEOS_DEPLOYMENT_TARGET: "18.0"
+
+          targets:
+            Wonder:
+              type: application
+              platform: iOS
+              sources:
+                - Wonder
+              settings:
+                base:
+                  PRODUCT_BUNDLE_IDENTIFIER: com.peakguy2341.wonder
+                  PRODUCT_NAME: Wonder
+                  INFOPLIST_KEY_CFBundleDisplayName: Wonder
+                  GENERATE_INFOPLIST_FILE: YES
+                  ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+                  TARGETED_DEVICE_FAMILY: "1,2"
+                  SUPPORTS_MACCATALYST: NO
+                  CODE_SIGN_STYLE: Manual
+          YAML
+
+          xcodegen generate
+
+      - name: Create Wonder app
+        run: |
+          cat > Wonder/WonderApp.swift <<'SWIFT'
+          import SwiftUI
+
+          @main
+          struct WonderApp: App {
+              var body: some Scene {
+                  WindowGroup {
+                      ContentView()
+                          .preferredColorScheme(.dark)
+                  }
+              }
+          }
+          SWIFT
+
+          cat > Wonder/ContentView.swift <<'SWIFT'
+          import SwiftUI
+
+          struct ContentView: View {
+              @State private var showLibrary = false
+
+              private let purple = Color(
+                  red: 0.48,
+                  green: 0.32,
+                  blue: 0.92
+              )
+
+              var body: some View {
+                  ZStack {
+                      LinearGradient(
+                          colors: [
+                              Color(red: 0.08, green: 0.05, blue: 0.18),
+                              Color(red: 0.16, green: 0.09, blue: 0.34),
+                              Color(red: 0.07, green: 0.06, blue: 0.17)
+                          ],
+                          startPoint: .topLeading,
+                          endPoint: .bottomTrailing
+                      )
+                      .ignoresSafeArea()
+
+                      Circle()
+                          .fill(purple.opacity(0.25))
+                          .frame(width: 280, height: 280)
+                          .blur(radius: 90)
+                          .offset(x: 130, y: -260)
+
+                      if showLibrary {
+                          libraryScreen
+                      } else {
+                          homeScreen
+                      }
+                  }
+                  .animation(.spring(response: 0.45), value: showLibrary)
+              }
+
+              private var homeScreen: some View {
+                  VStack(spacing: 0) {
+                      HStack {
+                          Text("WONDER")
+                              .font(.system(size: 13, weight: .bold))
+                              .tracking(4)
+                              .foregroundStyle(.white.opacity(0.65))
+
+                          Spacer()
+
+                          Image(systemName: "sparkles")
+                              .font(.system(size: 19, weight: .medium))
+                              .foregroundStyle(.white.opacity(0.8))
+                      }
+                      .padding(.horizontal, 26)
+                      .padding(.top, 18)
+
+                      Spacer()
+
+                      ZStack {
+                          Circle()
+                              .fill(purple.opacity(0.2))
+                              .frame(width: 210, height: 210)
+                              .blur(radius: 35)
+
+                          Image(systemName: "sparkles")
+                              .font(.system(size: 105, weight: .light))
+                              .symbolRenderingMode(.palette)
+                              .foregroundStyle(
+                                  .white,
+                                  Color(red: 0.95, green: 0.78, blue: 0.38)
+                              )
+                              .shadow(color: purple.opacity(0.8), radius: 30)
+                      }
+                      .padding(.bottom, 34)
+
+                      Text("Welcome to Wonder")
+                          .font(.system(size: 32, weight: .bold))
+                          .tracking(-1)
+                          .multilineTextAlignment(.center)
+
+                      Text("Your adventure starts here.")
+                          .font(.system(size: 16))
+                          .foregroundStyle(.white.opacity(0.65))
+                          .padding(.top, 9)
+
+                      Spacer()
+
+                      glassCard {
+                          VStack(alignment: .leading, spacing: 14) {
+                              HStack {
+                                  Image(systemName: "square.grid.2x2")
+                                      .foregroundStyle(.white.opacity(0.8))
+
+                                  Text("YOUR WONDER SPACE")
+                                      .font(.system(size: 11, weight: .bold))
+                                      .tracking(2)
+                                      .foregroundStyle(.white.opacity(0.65))
+
+                                  Spacer()
+                              }
+
+                              Text("A new way to explore.")
+                                  .font(.system(size: 20, weight: .semibold))
+
+                              Text("Discover the Wonder interface and your app library.")
+                                  .font(.system(size: 14))
+                                  .foregroundStyle(.white.opacity(0.65))
+                                  .fixedSize(horizontal: false, vertical: true)
+
+                              Button {
+                                  showLibrary = true
+                              } label: {
+                                  HStack {
+                                      Text("Get Started")
+                                      Spacer()
+                                      Image(systemName: "arrow.up.right")
+                                  }
+                                  .font(.system(size: 16, weight: .semibold))
+                                  .foregroundStyle(.white)
+                                  .padding(.horizontal, 19)
+                                  .padding(.vertical, 16)
+                                  .background {
+                                      RoundedRectangle(cornerRadius: 19)
+                                          .fill(purple.gradient)
+                                  }
+                              }
+                              .buttonStyle(.plain)
+                          }
+                      }
+                      .padding(.horizontal, 22)
+                      .padding(.bottom, 28)
+                  }
+                  .foregroundStyle(.white)
+              }
+
+              private var libraryScreen: some View {
+                  VStack(spacing: 24) {
+                      HStack {
+                          Button {
+                              showLibrary = false
+                          } label: {
+                              Image(systemName: "chevron.left")
+                                  .font(.system(size: 17, weight: .semibold))
+                                  .foregroundStyle(.white)
+                                  .padding(12)
+                                  .background(.white.opacity(0.10), in: Circle())
+                          }
+
+                          Spacer()
+
+                          Text("LIBRARY")
+                              .font(.system(size: 12, weight: .bold))
+                              .tracking(3)
+                              .foregroundStyle(.white.opacity(0.7))
+
+                          Spacer()
+
+                          Image(systemName: "square.grid.2x2")
+                              .foregroundStyle(.white.opacity(0.8))
+                              .padding(12)
+                      }
+
+                      Spacer()
+
+                      glassCard {
+                          VStack(spacing: 16) {
+                              Image(systemName: "gamecontroller")
+                                  .font(.system(size: 48, weight: .light))
+                                  .foregroundStyle(.white.opacity(0.85))
+
+                              Text("Your library")
+                                  .font(.system(size: 25, weight: .bold))
+
+                              Text("Your Wonder app space is ready.")
+                                  .font(.system(size: 14))
+                                  .foregroundStyle(.white.opacity(0.65))
+                                  .multilineTextAlignment(.center)
+
+                              Text("This V1 is an interface preview. Game loading is not included.")
+                                  .font(.system(size: 12))
+                                  .foregroundStyle(.white.opacity(0.45))
+                                  .multilineTextAlignment(.center)
+                          }
+                          .frame(maxWidth: .infinity)
+                          .padding(.vertical, 34)
+                      }
+
+                      Spacer()
+                  }
+                  .padding(.horizontal, 22)
+                  .padding(.top, 18)
+                  .foregroundStyle(.white)
+              }
+
+              @ViewBuilder
+              private func glassCard<Content: View>(
+                  @ViewBuilder content: () -> Content
+              ) -> some View {
+                  let shape = RoundedRectangle(cornerRadius: 28)
+
+                  if #available(iOS 26.0, *) {
+                      content()
+                          .padding(21)
+                          .background {
+                              shape.fill(.white.opacity(0.07))
+                          }
+                          .glassEffect(.regular, in: shape)
+                          .overlay {
+                              shape.stroke(.white.opacity(0.16), lineWidth: 1)
+                          }
+                  } else {
+                      content()
+                          .padding(21)
+                          .background(.ultraThinMaterial, in: shape)
+                          .overlay {
+                              shape.stroke(.white.opacity(0.15), lineWidth: 1)
+                          }
+                  }
+              }
+          }
+          SWIFT
+
+      - name: Generate Xcode project
+        run: |
+          set -e
+          xcodegen generate
+          xcodebuild -list -project Wonder.xcodeproj
+
+      - name: Build Wonder for iOS
+        run: |
+          set -e
+
+          xcodebuild \
+            -project Wonder.xcodeproj \
+            -scheme Wonder \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Package standard iOS IPA
+        run: |
+          set -e
+
+          APP_PATH="build/Build/Products/Release-iphoneos/Wonder.app"
+
+          if [ ! -d "$APP_PATH" ]; then
+            echo "ERROR: Wonder.app was not created."
+            exit 1
+          fi
+
+          mkdir -p package/Payload
+          cp -R "$APP_PATH" package/Payload/Wonder.app
+
+          test -f package/Payload/Wonder.app/Info.plist
+
+          cd package
+          /usr/bin/zip -qry ../Wonder-Mobile-V1.ipa Payload
+          cd ..
+
+          echo "IPA contents:"
+          unzip -l Wonder-Mobile-V1.ipa
+
+          test -s Wonder-Mobile-V1.ipa
+
+      - name: Upload Wonder IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Wonder-Mobile-V1-IPA
+          path: Wonder-Mobile-V1.ipa
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload build information
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Wonder-Mobile-Build-Report
-          path: wonder-mobile-report.txt
+          name: Wonder-Mobile-V1-Build-Report
+          path: |
+            project.yml
+            Wonder/
           if-no-files-found: ignore
           retention-days: 7
