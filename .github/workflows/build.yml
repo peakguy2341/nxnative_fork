@@ -1,4 +1,4 @@
-name: Wonder Mobile - nxnative Build Checks
+name: nxnative iOS Source Build
 
 on:
   workflow_dispatch:
@@ -7,111 +7,82 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: Check Wonder Mobile Build Environment
+  ios-source-build:
+    name: Build nxnative iOS Source
     runs-on: xcode-27
-    timeout-minutes: 30
+    timeout-minutes: 120
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Show build environment
+      - name: Verify the actual nxnative source files
         run: |
-          echo "=== SYSTEM ==="
-          uname -a
+          set -euo pipefail
 
-          echo ""
-          echo "=== XCODE ==="
+          test -f dm/ios/tools/build_smoke.py
+          test -f dm/ios/project.yml
+
+          echo "Verified nxnative iOS source files."
+          echo "This workflow will use the source-build smoke test only."
+
+      - name: Select Xcode
+        run: |
+          set -euo pipefail
           xcodebuild -version
+          xcode-select -p
 
-          echo ""
-          echo "=== SWIFT ==="
-          swift --version
-
-          echo ""
-          echo "=== PYTHON ==="
-          python3 --version
-
-          echo ""
-          echo "=== GIT ==="
-          git --version
-
-      - name: Check required tools
+      - name: Install build tools
         run: |
-          set -e
+          set -euo pipefail
+          brew install xcodegen zstd glslang
 
-          echo "=== TOOL CHECK ==="
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-          command -v xcodebuild
-          command -v swift
-          command -v python3
-          command -v bash
-
-          if command -v xcodegen >/dev/null 2>&1; then
-            xcodegen version
-          else
-            echo "XcodeGen is not installed."
-          fi
-
-      - name: Check nxnative project files
+      - name: Install Python dependencies
         run: |
-          set -e
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install \
+            lz4 \
+            "capstone>=5,<6" \
+            fonttools \
+            nsz \
+            zbic
 
-          echo "=== PROJECT FILE CHECK ==="
-
-          FILES=(
-            "dm/ios/project.yml"
-            "dm/ios/tools/build_ipa.sh"
-          )
-
-          for FILE in "${FILES[@]}"; do
-            if [ -f "$FILE" ]; then
-              echo "FOUND: $FILE"
-            else
-              echo "MISSING: $FILE"
-              exit 1
-            fi
-          done
-
-      - name: Validate build script syntax
+      - name: Download Apple Metal Toolchain
         run: |
-          set -e
+          set -euo pipefail
+          xcodebuild -downloadComponent MetalToolchain
 
-          echo "=== BASH SYNTAX CHECK ==="
-
-          bash -n dm/ios/tools/build_ipa.sh
-
-          echo "build_ipa.sh syntax is valid."
-
-      - name: Inspect Xcode project configuration
+      - name: Build the actual nxnative iOS source
+        env:
+          GAME: "010015100B514000"
         run: |
-          set -e
+          set -euo pipefail
 
-          echo "=== PROJECT CONFIGURATION ==="
+          OUTPUT="$RUNNER_TEMP/nxnative-ios-smoke"
+          mkdir -p "$OUTPUT"
 
-          grep -nE \
-            '^(name:|options:|targets:|schemes:|configFiles:)' \
-            dm/ios/project.yml || true
+          GAME="$GAME" python3 dm/ios/tools/build_smoke.py \
+            --output "$OUTPUT" 2>&1 | tee "$RUNNER_TEMP/nxnative-build.log"
 
-      - name: Inspect build script requirements
-        run: |
-          set -e
+          echo "NXNATIVE_SOURCE_BUILD_RESULT=SUCCESS" \
+            >> "$GITHUB_STEP_SUMMARY"
 
-          echo "=== BUILD SCRIPT REQUIREMENTS ==="
+          echo "Source build completed."
+          echo "Output: $OUTPUT"
 
-          grep -nE \
-            'GAME|PATCHED|ROMFS|MSL_IOS|DM_XCODE_PROJECT_DIR|prepare-xcode' \
-            dm/ios/tools/build_ipa.sh || true
-
-      - name: Final report
-        run: |
-          echo ""
-          echo "=================================="
-          echo " WONDER MOBILE BUILD CHECKS DONE"
-          echo "=================================="
-          echo ""
-          echo "Repository checks completed."
-          echo "Build script syntax checked."
-          echo "No game data was processed."
-          echo "No IPA was generated."
+      - name: Upload source build and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nxnative-ios-source-build
+          path: |
+            ${{ runner.temp }}/nxnative-ios-smoke/
+            ${{ runner.temp }}/nxnative-build.log
+          if-no-files-found: warn
+          retention-days: 7
