@@ -1,4 +1,4 @@
-name: Wonder Mobile V2 - Play UI
+name: Wonder Mobile - nxnative Build
 
 on:
   workflow_dispatch:
@@ -8,398 +8,186 @@ permissions:
 
 jobs:
   build:
-    name: Build Wonder Mobile IPA
+    name: Build nxnative for iOS
     runs-on: xcode-27
-    timeout-minutes: 60
+    timeout-minutes: 180
 
     steps:
-      - name: Checkout repository
+      - name: Checkout nxnative fork
         uses: actions/checkout@v4
+        with:
+          repository: peakguy2341/nxnative_fork
+          fetch-depth: 0
 
-      - name: Check build environment
+      - name: Show build environment
         run: |
           set -e
           sw_vers
+          xcodebuild -version
           uname -m
+          python3 --version
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode_27.2.app
+          sudo xcodebuild -license accept
           xcodebuild -version
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
-
-      - name: Create project folders
-        run: |
-          mkdir -p Wonder
-          mkdir -p package/Payload
-
-      - name: Create Xcode project
-        run: |
-          cat > project.yml <<'YAML'
-          name: Wonder
-
-          options:
-            bundleIdPrefix: com.peakguy2341
-            deploymentTarget:
-              iOS: "18.0"
-
-          settings:
-            base:
-              SWIFT_VERSION: 5.0
-              IPHONEOS_DEPLOYMENT_TARGET: "18.0"
-
-          targets:
-            Wonder:
-              type: application
-              platform: iOS
-              sources:
-                - Wonder
-              settings:
-                base:
-                  PRODUCT_BUNDLE_IDENTIFIER: com.peakguy2341.wonder
-                  PRODUCT_NAME: Wonder
-                  INFOPLIST_KEY_CFBundleDisplayName: Wonder
-                  GENERATE_INFOPLIST_FILE: YES
-                  INFOPLIST_KEY_UIFileSharingEnabled: YES
-                  INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace: YES
-                  TARGETED_DEVICE_FAMILY: "1,2"
-                  SUPPORTS_MACCATALYST: NO
-                  CODE_SIGN_STYLE: Manual
-          YAML
-
-          xcodegen generate
-
-      - name: Create Wonder source files
-        run: |
-          cat > Wonder/WonderApp.swift <<'SWIFT'
-          import SwiftUI
-
-          @main
-          struct WonderApp: App {
-              init() {
-                  FolderManager.shared.createFolders()
-              }
-
-              var body: some Scene {
-                  WindowGroup {
-                      ContentView()
-                          .preferredColorScheme(.dark)
-                  }
-              }
-          }
-          SWIFT
-
-          cat > Wonder/FolderManager.swift <<'SWIFT'
-          import Foundation
-
-          final class FolderManager {
-              static let shared = FolderManager()
-
-              let folderNames = ["roms", "update", "firm"]
-
-              var documents: URL {
-                  FileManager.default.urls(
-                      for: .documentDirectory,
-                      in: .userDomainMask
-                  )[0]
-              }
-
-              func createFolders() {
-                  for name in folderNames {
-                      let url = documents.appendingPathComponent(
-                          name,
-                          isDirectory: true
-                      )
-
-                      do {
-                          try FileManager.default.createDirectory(
-                              at: url,
-                              withIntermediateDirectories: true
-                          )
-                      } catch {
-                          print("Folder creation failed: \(error)")
-                      }
-                  }
-              }
-
-              func folderExists(_ name: String) -> Bool {
-                  var isDirectory: ObjCBool = false
-                  let path = documents
-                      .appendingPathComponent(name)
-                      .path
-
-                  return FileManager.default.fileExists(
-                      atPath: path,
-                      isDirectory: &isDirectory
-                  ) && isDirectory.boolValue
-              }
-
-              func fileCount(_ name: String) -> Int {
-                  let url = documents.appendingPathComponent(name)
-
-                  return (try? FileManager.default.contentsOfDirectory(
-                      at: url,
-                      includingPropertiesForKeys: nil,
-                      options: [.skipsHiddenFiles]
-                  ).count) ?? 0
-              }
-
-              func allFoldersExist() -> Bool {
-                  folderNames.allSatisfy { folderExists($0) }
-              }
-          }
-          SWIFT
-
-          cat > Wonder/ContentView.swift <<'SWIFT'
-          import SwiftUI
-
-          struct ContentView: View {
-              @State private var status = "Ready"
-              @State private var showStatus = false
-
-              private let purple = Color(
-                  red: 0.48,
-                  green: 0.32,
-                  blue: 0.92
-              )
-
-              var body: some View {
-                  ZStack {
-                      LinearGradient(
-                          colors: [
-                              Color(red: 0.07, green: 0.04, blue: 0.16),
-                              Color(red: 0.19, green: 0.10, blue: 0.39),
-                              Color(red: 0.06, green: 0.05, blue: 0.16)
-                          ],
-                          startPoint: .topLeading,
-                          endPoint: .bottomTrailing
-                      )
-                      .ignoresSafeArea()
-
-                      Circle()
-                          .fill(purple.opacity(0.3))
-                          .frame(width: 300, height: 300)
-                          .blur(radius: 100)
-                          .offset(x: 130, y: -250)
-
-                      VStack(spacing: 25) {
-                          header
-
-                          Spacer()
-
-                          Image(systemName: "sparkles")
-                              .font(.system(size: 90, weight: .light))
-                              .foregroundStyle(.white)
-                              .shadow(color: purple, radius: 30)
-
-                          Text("SUPER MARIO BROS. WONDER")
-                              .font(.system(size: 22, weight: .bold))
-                              .tracking(-0.5)
-                              .multilineTextAlignment(.center)
-
-                          Text("Your adventure starts here.")
-                              .foregroundStyle(.white.opacity(0.65))
-
-                          Button {
-                              checkGameSetup()
-                          } label: {
-                              HStack {
-                                  Image(systemName: "play.fill")
-                                  Text("PLAY")
-                                      .tracking(3)
-                              }
-                              .font(.system(size: 17, weight: .bold))
-                              .frame(maxWidth: .infinity)
-                              .padding(19)
-                              .background(
-                                  purple.gradient,
-                                  in: RoundedRectangle(cornerRadius: 20)
-                              )
-                          }
-                          .buttonStyle(.plain)
-
-                          if showStatus {
-                              Text(status)
-                                  .font(.system(size: 13))
-                                  .foregroundStyle(.white.opacity(0.8))
-                                  .multilineTextAlignment(.center)
-                                  .padding(.horizontal, 12)
-                          }
-
-                          Spacer()
-
-                          glassCard {
-                              VStack(alignment: .leading, spacing: 15) {
-                                  Label(
-                                      "WONDER STORAGE",
-                                      systemImage: "folder"
-                                  )
-                                  .font(.system(size: 11, weight: .bold))
-                                  .tracking(2)
-                                  .foregroundStyle(.white.opacity(0.65))
-
-                                  folderRow("roms")
-                                  folderRow("update")
-                                  folderRow("firm")
-
-                                  Text("Files → On My iPad → Wonder")
-                                      .font(.system(size: 12))
-                                      .foregroundStyle(.white.opacity(0.5))
-                              }
-                          }
-                      }
-                      .padding(.horizontal, 24)
-                      .padding(.top, 20)
-                      .padding(.bottom, 20)
-                  }
-                  .onAppear {
-                      FolderManager.shared.createFolders()
-                  }
-              }
-
-              private var header: some View {
-                  HStack {
-                      Text("WONDER")
-                          .font(.system(size: 13, weight: .bold))
-                          .tracking(4)
-                          .foregroundStyle(.white.opacity(0.7))
-
-                      Spacer()
-
-                      Image(systemName: "sparkles")
-                  }
-              }
-
-              private func folderRow(_ name: String) -> some View {
-                  HStack {
-                      Image(systemName: "folder.fill")
-                          .foregroundStyle(.yellow)
-
-                      Text(name)
-
-                      Spacer()
-
-                      Text(
-                          "\(FolderManager.shared.fileCount(name)) items"
-                      )
-                      .foregroundStyle(.white.opacity(0.55))
-                  }
-                  .font(.system(size: 14, weight: .medium))
-              }
-
-              private func checkGameSetup() {
-                  FolderManager.shared.createFolders()
-
-                  if !FolderManager.shared.allFoldersExist() {
-                      status = "Some Wonder folders are missing."
-                  } else {
-                      status = "Storage is ready. A compatible game runtime is not connected yet."
-                  }
-
-                  showStatus = true
-              }
-
-              @ViewBuilder
-              private func glassCard<Content: View>(
-                  @ViewBuilder content: () -> Content
-              ) -> some View {
-                  let shape = RoundedRectangle(cornerRadius: 25)
-
-                  if #available(iOS 26.0, *) {
-                      content()
-                          .padding(20)
-                          .background {
-                              shape.fill(.white.opacity(0.06))
-                          }
-                          .glassEffect(.regular, in: shape)
-                          .overlay {
-                              shape.stroke(
-                                  .white.opacity(0.15),
-                                  lineWidth: 1
-                              )
-                          }
-                  } else {
-                      content()
-                          .padding(20)
-                          .background(.ultraThinMaterial, in: shape)
-                          .overlay {
-                              shape.stroke(
-                                  .white.opacity(0.15),
-                                  lineWidth: 1
-                              )
-                          }
-                  }
-              }
-          }
-          SWIFT
-
-      - name: Generate Xcode project
+      - name: Install native dependencies
         run: |
           set -e
-          xcodegen generate
-          xcodebuild -list -project Wonder.xcodeproj
+          brew update
+          brew install xcodegen zstd glslang
+          dotnet --info
 
-      - name: Build Wonder
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install project-generation tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install setuptools wheel
+
+      - name: Inspect nxnative project
         run: |
           set -e
-          xcodebuild \
-            -project Wonder.xcodeproj \
-            -scheme Wonder \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
-            build
+          echo "=== REPOSITORY ROOT ==="
+          ls -la
 
-      - name: Configure Files sharing
-        run: |
-          set -e
-          APP="build/Build/Products/Release-iphoneos/Wonder.app"
-          INFO="$APP/Info.plist"
+          echo "=== XCODE PROJECTS ==="
+          find . -name '*.xcodeproj' -o -name '*.xcworkspace'
 
-          /usr/libexec/PlistBuddy \
-            -c "Set :UIFileSharingEnabled true" "$INFO" \
-            || /usr/libexec/PlistBuddy \
-            -c "Add :UIFileSharingEnabled bool true" "$INFO"
+          echo "=== XCODEGEN CONFIGURATION ==="
+          find . -name 'project.yml' -o -name 'project.yaml'
 
-          /usr/libexec/PlistBuddy \
-            -c "Set :LSSupportsOpeningDocumentsInPlace true" "$INFO" \
-            || /usr/libexec/PlistBuddy \
-            -c "Add :LSSupportsOpeningDocumentsInPlace bool true" "$INFO"
+          echo "=== BUILD CONFIGURATION ==="
+          find . -maxdepth 3 \
+            \( -name 'Makefile' -o -name '*.xcconfig' \)
 
-      - name: Package IPA
+      - name: Generate Xcode project if required
         run: |
           set -e
 
-          APP="build/Build/Products/Release-iphoneos/Wonder.app"
+          CONFIG="$(find . -name project.yml -o -name project.yaml | head -n 1)"
 
-          test -d "$APP"
-          test -f "$APP/Info.plist"
+          if [ -n "$CONFIG" ]; then
+            PROJECT_DIR="$(dirname "$CONFIG")"
+            cd "$PROJECT_DIR"
+            xcodegen generate
+            cd "$GITHUB_WORKSPACE"
+          else
+            echo "No XcodeGen configuration found."
+            echo "Using existing Xcode project if available."
+          fi
 
-          mkdir -p package/Payload
-          cp -R "$APP" package/Payload/Wonder.app
+      - name: Locate Xcode project
+        id: locate
+        shell: bash
+        run: |
+          set -e
 
-          cd package
-          zip -qry ../Wonder-Mobile-V2.ipa Payload
-          cd ..
+          WORKSPACE="$(find . -maxdepth 4 -name '*.xcworkspace' | head -n 1)"
+          PROJECT="$(find . -maxdepth 4 -name '*.xcodeproj' | head -n 1)"
 
-          test -s Wonder-Mobile-V2.ipa
-          unzip -l Wonder-Mobile-V2.ipa
+          if [ -n "$WORKSPACE" ]; then
+            echo "kind=workspace" >> "$GITHUB_OUTPUT"
+            echo "path=$WORKSPACE" >> "$GITHUB_OUTPUT"
+          elif [ -n "$PROJECT" ]; then
+            echo "kind=project" >> "$GITHUB_OUTPUT"
+            echo "path=$PROJECT" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::No Xcode project or workspace found."
+            exit 1
+          fi
 
-      - name: Upload Wonder IPA
+      - name: Discover build scheme
+        id: scheme
+        shell: bash
+        run: |
+          set -e
+
+          KIND="${{ steps.locate.outputs.kind }}"
+          PATH_VALUE="${{ steps.locate.outputs.path }}"
+
+          if [ "$KIND" = "workspace" ]; then
+            xcodebuild -list -json -workspace "$PATH_VALUE" > schemes.json
+          else
+            xcodebuild -list -json -project "$PATH_VALUE" > schemes.json
+          fi
+
+          SCHEME="$(python -c '
+          import json
+          d=json.load(open("schemes.json"))
+          obj=next(iter(d.values()))
+          schemes=obj.get("schemes", [])
+          if not schemes:
+              raise SystemExit("No shared Xcode schemes found.")
+          print(schemes[0])
+          ')"
+
+          echo "Selected scheme: $SCHEME"
+          echo "name=$SCHEME" >> "$GITHUB_OUTPUT"
+
+      - name: Archive nxnative app
+        run: |
+          set -e
+
+          KIND="${{ steps.locate.outputs.kind }}"
+          PATH_VALUE="${{ steps.locate.outputs.path }}"
+          SCHEME="${{ steps.scheme.outputs.name }}"
+
+          if [ "$KIND" = "workspace" ]; then
+            xcodebuild archive \
+              -workspace "$PATH_VALUE" \
+              -scheme "$SCHEME" \
+              -destination 'generic/platform=iOS' \
+              -archivePath "$RUNNER_TEMP/Wonder.xcarchive" \
+              -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+              CODE_SIGNING_ALLOWED=NO
+          else
+            xcodebuild archive \
+              -project "$PATH_VALUE" \
+              -scheme "$SCHEME" \
+              -destination 'generic/platform=iOS' \
+              -archivePath "$RUNNER_TEMP/Wonder.xcarchive" \
+              -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+              CODE_SIGNING_ALLOWED=NO
+          fi
+
+      - name: Package unsigned IPA
+        run: |
+          set -e
+
+          APP="$(find "$RUNNER_TEMP/Wonder.xcarchive/Products/Applications" \
+            -maxdepth 1 -name '*.app' | head -n 1)"
+
+          if [ -z "$APP" ]; then
+            echo "::error::No iOS app found in archive."
+            exit 1
+          fi
+
+          mkdir -p "$RUNNER_TEMP/ipa/Payload"
+          cp -R "$APP" "$RUNNER_TEMP/ipa/Payload/"
+
+          cd "$RUNNER_TEMP/ipa"
+          zip -r "$GITHUB_WORKSPACE/Wonder-nxnative-unsigned.ipa" Payload
+
+      - name: Upload nxnative IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Wonder-Mobile-V2-IPA
-          path: Wonder-Mobile-V2.ipa
+          name: Wonder-nxnative-unsigned-IPA
+          path: Wonder-nxnative-unsigned.ipa
           if-no-files-found: error
           retention-days: 7
 
-      - name: Upload build report
+      - name: Upload Xcode archive
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Wonder-Mobile-V2-Build-Report
+          name: Wonder-nxnative-build-logs
           path: |
-            project.yml
-            Wonder/
+            ${{ runner.temp }}/Wonder.xcarchive
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 3
