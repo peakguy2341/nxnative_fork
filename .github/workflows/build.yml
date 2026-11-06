@@ -1,4 +1,4 @@
-name: Wonder Mobile V1 - Liquid Glass
+name: Wonder Mobile V2 - Play UI
 
 on:
   workflow_dispatch:
@@ -24,17 +24,14 @@ jobs:
           xcodebuild -version
 
       - name: Install XcodeGen
-        run: |
-          set -e
-          brew install xcodegen
+        run: brew install xcodegen
 
       - name: Create project folders
         run: |
-          set -e
           mkdir -p Wonder
           mkdir -p package/Payload
 
-      - name: Create Xcode project configuration
+      - name: Create Xcode project
         run: |
           cat > project.yml <<'YAML'
           name: Wonder
@@ -70,7 +67,7 @@ jobs:
 
           xcodegen generate
 
-      - name: Create Wonder app
+      - name: Create Wonder source files
         run: |
           cat > Wonder/WonderApp.swift <<'SWIFT'
           import SwiftUI
@@ -96,37 +93,57 @@ jobs:
           final class FolderManager {
               static let shared = FolderManager()
 
-              private let folderNames = [
-                  "roms",
-                  "update",
-                  "firm"
-              ]
+              let folderNames = ["roms", "update", "firm"]
 
-              func createFolders() {
-                  let documents = FileManager.default.urls(
+              var documents: URL {
+                  FileManager.default.urls(
                       for: .documentDirectory,
                       in: .userDomainMask
                   )[0]
+              }
 
+              func createFolders() {
                   for name in folderNames {
-                      let folder = documents.appendingPathComponent(
+                      let url = documents.appendingPathComponent(
                           name,
                           isDirectory: true
                       )
 
                       do {
                           try FileManager.default.createDirectory(
-                              at: folder,
+                              at: url,
                               withIntermediateDirectories: true
                           )
-
-                          print("Wonder folder ready: \(name)")
                       } catch {
-                          print(
-                              "Could not create \(name): \(error)"
-                          )
+                          print("Folder creation failed: \(error)")
                       }
                   }
+              }
+
+              func folderExists(_ name: String) -> Bool {
+                  var isDirectory: ObjCBool = false
+                  let path = documents
+                      .appendingPathComponent(name)
+                      .path
+
+                  return FileManager.default.fileExists(
+                      atPath: path,
+                      isDirectory: &isDirectory
+                  ) && isDirectory.boolValue
+              }
+
+              func fileCount(_ name: String) -> Int {
+                  let url = documents.appendingPathComponent(name)
+
+                  return (try? FileManager.default.contentsOfDirectory(
+                      at: url,
+                      includingPropertiesForKeys: nil,
+                      options: [.skipsHiddenFiles]
+                  ).count) ?? 0
+              }
+
+              func allFoldersExist() -> Bool {
+                  folderNames.allSatisfy { folderExists($0) }
               }
           }
           SWIFT
@@ -135,6 +152,9 @@ jobs:
           import SwiftUI
 
           struct ContentView: View {
+              @State private var status = "Ready"
+              @State private var showStatus = false
+
               private let purple = Color(
                   red: 0.48,
                   green: 0.32,
@@ -145,9 +165,9 @@ jobs:
                   ZStack {
                       LinearGradient(
                           colors: [
-                              Color(red: 0.08, green: 0.05, blue: 0.18),
-                              Color(red: 0.16, green: 0.09, blue: 0.34),
-                              Color(red: 0.07, green: 0.06, blue: 0.17)
+                              Color(red: 0.07, green: 0.04, blue: 0.16),
+                              Color(red: 0.19, green: 0.10, blue: 0.39),
+                              Color(red: 0.06, green: 0.05, blue: 0.16)
                           ],
                           startPoint: .topLeading,
                           endPoint: .bottomTrailing
@@ -155,38 +175,54 @@ jobs:
                       .ignoresSafeArea()
 
                       Circle()
-                          .fill(purple.opacity(0.25))
-                          .frame(width: 280, height: 280)
-                          .blur(radius: 90)
-                          .offset(x: 130, y: -260)
+                          .fill(purple.opacity(0.3))
+                          .frame(width: 300, height: 300)
+                          .blur(radius: 100)
+                          .offset(x: 130, y: -250)
 
                       VStack(spacing: 25) {
-                          HStack {
-                              Text("WONDER")
-                                  .font(.system(size: 13, weight: .bold))
-                                  .tracking(4)
-                                  .foregroundStyle(.white.opacity(0.7))
-
-                              Spacer()
-
-                              Image(systemName: "sparkles")
-                                  .font(.system(size: 20))
-                          }
-                          .padding(.top, 18)
+                          header
 
                           Spacer()
 
                           Image(systemName: "sparkles")
-                              .font(.system(size: 95, weight: .light))
+                              .font(.system(size: 90, weight: .light))
                               .foregroundStyle(.white)
                               .shadow(color: purple, radius: 30)
 
-                          Text("Welcome to Wonder")
-                              .font(.system(size: 31, weight: .bold))
-                              .tracking(-1)
+                          Text("SUPER MARIO BROS. WONDER")
+                              .font(.system(size: 22, weight: .bold))
+                              .tracking(-0.5)
+                              .multilineTextAlignment(.center)
 
                           Text("Your adventure starts here.")
                               .foregroundStyle(.white.opacity(0.65))
+
+                          Button {
+                              checkGameSetup()
+                          } label: {
+                              HStack {
+                                  Image(systemName: "play.fill")
+                                  Text("PLAY")
+                                      .tracking(3)
+                              }
+                              .font(.system(size: 17, weight: .bold))
+                              .frame(maxWidth: .infinity)
+                              .padding(19)
+                              .background(
+                                  purple.gradient,
+                                  in: RoundedRectangle(cornerRadius: 20)
+                              )
+                          }
+                          .buttonStyle(.plain)
+
+                          if showStatus {
+                              Text(status)
+                                  .font(.system(size: 13))
+                                  .foregroundStyle(.white.opacity(0.8))
+                                  .multilineTextAlignment(.center)
+                                  .padding(.horizontal, 12)
+                          }
 
                           Spacer()
 
@@ -200,43 +236,65 @@ jobs:
                                   .tracking(2)
                                   .foregroundStyle(.white.opacity(0.65))
 
-                                  Text("Your Wonder folders are ready.")
-                                      .font(.system(size: 21, weight: .semibold))
+                                  folderRow("roms")
+                                  folderRow("update")
+                                  folderRow("firm")
 
-                                  Text(
-                                      "Find your folders in Files → On My iPad → Wonder."
-                                  )
-                                  .font(.system(size: 14))
-                                  .foregroundStyle(.white.opacity(0.65))
-
-                                  HStack(spacing: 10) {
-                                      Image(systemName: "folder.fill")
-                                          .foregroundStyle(.yellow)
-
-                                      Text("roms")
-                                      Spacer()
-
-                                      Image(systemName: "folder.fill")
-                                          .foregroundStyle(.yellow)
-
-                                      Text("update")
-                                  }
-                                  .font(.system(size: 13, weight: .medium))
-
-                                  HStack(spacing: 10) {
-                                      Image(systemName: "folder.fill")
-                                          .foregroundStyle(.yellow)
-
-                                      Text("firm")
-                                  }
-                                  .font(.system(size: 13, weight: .medium))
+                                  Text("Files → On My iPad → Wonder")
+                                      .font(.system(size: 12))
+                                      .foregroundStyle(.white.opacity(0.5))
                               }
                           }
-                          .padding(.horizontal, 22)
-                          .padding(.bottom, 25)
                       }
-                      .padding(.horizontal, 22)
+                      .padding(.horizontal, 24)
+                      .padding(.top, 20)
+                      .padding(.bottom, 20)
                   }
+                  .onAppear {
+                      FolderManager.shared.createFolders()
+                  }
+              }
+
+              private var header: some View {
+                  HStack {
+                      Text("WONDER")
+                          .font(.system(size: 13, weight: .bold))
+                          .tracking(4)
+                          .foregroundStyle(.white.opacity(0.7))
+
+                      Spacer()
+
+                      Image(systemName: "sparkles")
+                  }
+              }
+
+              private func folderRow(_ name: String) -> some View {
+                  HStack {
+                      Image(systemName: "folder.fill")
+                          .foregroundStyle(.yellow)
+
+                      Text(name)
+
+                      Spacer()
+
+                      Text(
+                          "\(FolderManager.shared.fileCount(name)) items"
+                      )
+                      .foregroundStyle(.white.opacity(0.55))
+                  }
+                  .font(.system(size: 14, weight: .medium))
+              }
+
+              private func checkGameSetup() {
+                  FolderManager.shared.createFolders()
+
+                  if !FolderManager.shared.allFoldersExist() {
+                      status = "Some Wonder folders are missing."
+                  } else {
+                      status = "Storage is ready. A compatible game runtime is not connected yet."
+                  }
+
+                  showStatus = true
               }
 
               @ViewBuilder
@@ -261,10 +319,7 @@ jobs:
                   } else {
                       content()
                           .padding(20)
-                          .background(
-                              .ultraThinMaterial,
-                              in: shape
-                          )
+                          .background(.ultraThinMaterial, in: shape)
                           .overlay {
                               shape.stroke(
                                   .white.opacity(0.15),
@@ -282,10 +337,9 @@ jobs:
           xcodegen generate
           xcodebuild -list -project Wonder.xcodeproj
 
-      - name: Build Wonder for iOS
+      - name: Build Wonder
         run: |
           set -e
-
           xcodebuild \
             -project Wonder.xcodeproj \
             -scheme Wonder \
@@ -296,12 +350,11 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
-      - name: Configure Files app sharing
+      - name: Configure Files sharing
         run: |
           set -e
-
-          APP_PATH="build/Build/Products/Release-iphoneos/Wonder.app"
-          INFO="$APP_PATH/Info.plist"
+          APP="build/Build/Products/Release-iphoneos/Wonder.app"
+          INFO="$APP/Info.plist"
 
           /usr/libexec/PlistBuddy \
             -c "Set :UIFileSharingEnabled true" "$INFO" \
@@ -313,51 +366,38 @@ jobs:
             || /usr/libexec/PlistBuddy \
             -c "Add :LSSupportsOpeningDocumentsInPlace bool true" "$INFO"
 
-          echo "=== FILE SHARING SETTINGS ==="
-          /usr/libexec/PlistBuddy \
-            -c "Print :UIFileSharingEnabled" "$INFO"
-
-          /usr/libexec/PlistBuddy \
-            -c "Print :LSSupportsOpeningDocumentsInPlace" "$INFO"
-
-      - name: Package standard iOS IPA
+      - name: Package IPA
         run: |
           set -e
 
-          APP_PATH="build/Build/Products/Release-iphoneos/Wonder.app"
+          APP="build/Build/Products/Release-iphoneos/Wonder.app"
 
-          if [ ! -d "$APP_PATH" ]; then
-            echo "ERROR: Wonder.app was not created."
-            exit 1
-          fi
+          test -d "$APP"
+          test -f "$APP/Info.plist"
 
           mkdir -p package/Payload
-          cp -R "$APP_PATH" package/Payload/Wonder.app
-
-          test -f package/Payload/Wonder.app/Info.plist
+          cp -R "$APP" package/Payload/Wonder.app
 
           cd package
-          /usr/bin/zip -qry ../Wonder-Mobile-V1.ipa Payload
+          zip -qry ../Wonder-Mobile-V2.ipa Payload
           cd ..
 
-          echo "=== IPA CONTENTS ==="
-          unzip -l Wonder-Mobile-V1.ipa
-
-          test -s Wonder-Mobile-V1.ipa
+          test -s Wonder-Mobile-V2.ipa
+          unzip -l Wonder-Mobile-V2.ipa
 
       - name: Upload Wonder IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Wonder-Mobile-V1-IPA
-          path: Wonder-Mobile-V1.ipa
+          name: Wonder-Mobile-V2-IPA
+          path: Wonder-Mobile-V2.ipa
           if-no-files-found: error
           retention-days: 7
 
-      - name: Upload build information
+      - name: Upload build report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Wonder-Mobile-V1-Build-Report
+          name: Wonder-Mobile-V2-Build-Report
           path: |
             project.yml
             Wonder/
