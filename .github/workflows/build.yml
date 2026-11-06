@@ -1,4 +1,4 @@
-name: Wonder Mobile - nxnative Build
+name: Wonder Mobile - nxnative Project Validation
 
 on:
   workflow_dispatch:
@@ -7,10 +7,10 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build nxnative for iOS
+  prepare:
+    name: Prepare nxnative project
     runs-on: xcode-27
-    timeout-minutes: 180
+    timeout-minutes: 60
 
     steps:
       - name: Checkout nxnative fork
@@ -19,175 +19,93 @@ jobs:
           repository: peakguy2341/nxnative_fork
           fetch-depth: 0
 
-      - name: Show build environment
+      - name: Check environment
         run: |
           set -e
           sw_vers
           xcodebuild -version
-          uname -m
           python3 --version
+          uname -m
 
-      - name: Select Xcode
-        run: |
-          sudo xcode-select -s /Applications/Xcode_27.2.app
-          sudo xcodebuild -license accept
-          xcodebuild -version
-
-      - name: Install native dependencies
+      - name: Install build dependencies
         run: |
           set -e
           brew update
           brew install xcodegen zstd glslang
-          dotnet --info
 
-      - name: Set up Python
+      - name: Install Python tools
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Install project-generation tools
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install setuptools wheel
-
-      - name: Inspect nxnative project
+      - name: Inspect repository build instructions
         run: |
           set -e
-          echo "=== REPOSITORY ROOT ==="
-          ls -la
-
-          echo "=== XCODE PROJECTS ==="
-          find . -name '*.xcodeproj' -o -name '*.xcworkspace'
-
-          echo "=== XCODEGEN CONFIGURATION ==="
-          find . -name 'project.yml' -o -name 'project.yaml'
-
-          echo "=== BUILD CONFIGURATION ==="
+          echo "=== BUILD DOCUMENTATION ==="
           find . -maxdepth 3 \
-            \( -name 'Makefile' -o -name '*.xcconfig' \)
+            \( -iname 'readme*' -o -iname 'makefile' \
+            -o -iname '*.sh' -o -iname '*.yml' \
+            -o -iname '*.yaml' \) -print
 
-      - name: Generate Xcode project if required
-        run: |
-          set -e
+          echo "=== DM IOS DIRECTORY ==="
+          find dm/ios -maxdepth 2 -type f -print || true
 
-          CONFIG="$(find . -name project.yml -o -name project.yaml | head -n 1)"
-
-          if [ -n "$CONFIG" ]; then
-            PROJECT_DIR="$(dirname "$CONFIG")"
-            cd "$PROJECT_DIR"
-            xcodegen generate
-            cd "$GITHUB_WORKSPACE"
+          echo "=== GENERATION DIRECTORY ==="
+          if [ -d dm/ios/Gen ]; then
+            find dm/ios/Gen -maxdepth 2 -print
           else
-            echo "No XcodeGen configuration found."
-            echo "Using existing Xcode project if available."
+            echo "Gen directory does not exist."
           fi
 
-      - name: Locate Xcode project
-        id: locate
-        shell: bash
+      - name: Validate generated project prerequisites
         run: |
           set -e
+          cd dm/ios
 
-          WORKSPACE="$(find . -maxdepth 4 -name '*.xcworkspace' | head -n 1)"
-          PROJECT="$(find . -maxdepth 4 -name '*.xcodeproj' | head -n 1)"
+          REQUIRED=(
+            "Gen/dm.xcconfig"
+            "Gen/embed.S"
+            "Gen/Assets.xcassets"
+            "Gen/src"
+            "Gen/main/main.c"
+          )
 
-          if [ -n "$WORKSPACE" ]; then
-            echo "kind=workspace" >> "$GITHUB_OUTPUT"
-            echo "path=$WORKSPACE" >> "$GITHUB_OUTPUT"
-          elif [ -n "$PROJECT" ]; then
-            echo "kind=project" >> "$GITHUB_OUTPUT"
-            echo "path=$PROJECT" >> "$GITHUB_OUTPUT"
-          else
-            echo "::error::No Xcode project or workspace found."
+          MISSING=0
+
+          for item in "${REQUIRED[@]}"; do
+            if [ ! -e "$item" ]; then
+              echo "::warning::Missing generated prerequisite: $item"
+              MISSING=1
+            fi
+          done
+
+          if [ "$MISSING" -eq 1 ]; then
+            echo ""
+            echo "Project generation requires nxnative's documented"
+            echo "preparation process to have produced the Gen files."
+            echo "Stopping before XcodeGen to avoid a misleading failure."
             exit 1
           fi
 
-      - name: Discover build scheme
-        id: scheme
-        shell: bash
+      - name: Generate Xcode project
         run: |
           set -e
+          cd dm/ios
+          xcodegen generate
 
-          KIND="${{ steps.locate.outputs.kind }}"
-          PATH_VALUE="${{ steps.locate.outputs.path }}"
-
-          if [ "$KIND" = "workspace" ]; then
-            xcodebuild -list -json -workspace "$PATH_VALUE" > schemes.json
-          else
-            xcodebuild -list -json -project "$PATH_VALUE" > schemes.json
-          fi
-
-          SCHEME="$(python -c '
-          import json
-          d=json.load(open("schemes.json"))
-          obj=next(iter(d.values()))
-          schemes=obj.get("schemes", [])
-          if not schemes:
-              raise SystemExit("No shared Xcode schemes found.")
-          print(schemes[0])
-          ')"
-
-          echo "Selected scheme: $SCHEME"
-          echo "name=$SCHEME" >> "$GITHUB_OUTPUT"
-
-      - name: Archive nxnative app
+      - name: Validate Xcode project
         run: |
           set -e
+          cd dm/ios
+          xcodebuild -list
 
-          KIND="${{ steps.locate.outputs.kind }}"
-          PATH_VALUE="${{ steps.locate.outputs.path }}"
-          SCHEME="${{ steps.scheme.outputs.name }}"
-
-          if [ "$KIND" = "workspace" ]; then
-            xcodebuild archive \
-              -workspace "$PATH_VALUE" \
-              -scheme "$SCHEME" \
-              -destination 'generic/platform=iOS' \
-              -archivePath "$RUNNER_TEMP/Wonder.xcarchive" \
-              -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-              CODE_SIGNING_ALLOWED=NO
-          else
-            xcodebuild archive \
-              -project "$PATH_VALUE" \
-              -scheme "$SCHEME" \
-              -destination 'generic/platform=iOS' \
-              -archivePath "$RUNNER_TEMP/Wonder.xcarchive" \
-              -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-              CODE_SIGNING_ALLOWED=NO
-          fi
-
-      - name: Package unsigned IPA
-        run: |
-          set -e
-
-          APP="$(find "$RUNNER_TEMP/Wonder.xcarchive/Products/Applications" \
-            -maxdepth 1 -name '*.app' | head -n 1)"
-
-          if [ -z "$APP" ]; then
-            echo "::error::No iOS app found in archive."
-            exit 1
-          fi
-
-          mkdir -p "$RUNNER_TEMP/ipa/Payload"
-          cp -R "$APP" "$RUNNER_TEMP/ipa/Payload/"
-
-          cd "$RUNNER_TEMP/ipa"
-          zip -r "$GITHUB_WORKSPACE/Wonder-nxnative-unsigned.ipa" Payload
-
-      - name: Upload nxnative IPA
-        uses: actions/upload-artifact@v4
-        with:
-          name: Wonder-nxnative-unsigned-IPA
-          path: Wonder-nxnative-unsigned.ipa
-          if-no-files-found: error
-          retention-days: 7
-
-      - name: Upload Xcode archive
+      - name: Upload project files
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Wonder-nxnative-build-logs
+          name: nxnative-project-diagnostics
           path: |
-            ${{ runner.temp }}/Wonder.xcarchive
+            dm/ios/project.yml
+            dm/ios/Gen/
           if-no-files-found: ignore
           retention-days: 3
