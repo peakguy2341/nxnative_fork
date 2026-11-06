@@ -16,15 +16,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Verify the actual nxnative source files
+      - name: Verify source files
         run: |
           set -euo pipefail
-
           test -f dm/ios/tools/build_smoke.py
           test -f dm/ios/project.yml
-
-          echo "Verified nxnative iOS source files."
-          echo "This workflow will use the source-build smoke test only."
+          echo "nxnative source files verified."
 
       - name: Select Xcode
         run: |
@@ -46,37 +43,33 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          python -m pip install \
-            lz4 \
-            "capstone>=5,<6" \
-            fonttools \
-            nsz \
-            zbic
+          python -m pip install lz4 "capstone>=5,<6" fonttools nsz zbic
 
-      - name: Download Apple Metal Toolchain
+      - name: Download Metal Toolchain
         run: |
           set -euo pipefail
           xcodebuild -downloadComponent MetalToolchain
 
-      - name: Build the actual nxnative iOS source
+      - name: Build actual nxnative iOS source
         env:
           GAME: "010015100B514000"
         run: |
           set -euo pipefail
 
           OUTPUT="$RUNNER_TEMP/nxnative-ios-smoke"
-          mkdir -p "$OUTPUT"
+
+          if [ -e "$OUTPUT" ]; then
+            echo "Removing previous temporary output."
+            rm -rf "$OUTPUT"
+          fi
 
           GAME="$GAME" python3 dm/ios/tools/build_smoke.py \
-            --output "$OUTPUT" 2>&1 | tee "$RUNNER_TEMP/nxnative-build.log"
+            --output "$OUTPUT" \
+            2>&1 | tee "$RUNNER_TEMP/nxnative-build.log"
 
-          echo "NXNATIVE_SOURCE_BUILD_RESULT=SUCCESS" \
-            >> "$GITHUB_STEP_SUMMARY"
+          echo "Source smoke build completed."
 
-          echo "Source build completed."
-          echo "Output: $OUTPUT"
-
-      - name: Upload source build and logs
+      - name: Upload build output and logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
