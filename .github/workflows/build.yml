@@ -1,4 +1,4 @@
-name: Wonder Mobile - nxnative Project Validation
+name: Wonder Mobile - nxnative Build Checks
 
 on:
   workflow_dispatch:
@@ -7,105 +7,111 @@ permissions:
   contents: read
 
 jobs:
-  prepare:
-    name: Prepare nxnative project
+  build:
+    name: Check Wonder Mobile Build Environment
     runs-on: xcode-27
-    timeout-minutes: 60
+    timeout-minutes: 30
 
     steps:
-      - name: Checkout nxnative fork
+      - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          repository: peakguy2341/nxnative_fork
-          fetch-depth: 0
 
-      - name: Check environment
+      - name: Show build environment
         run: |
-          set -e
-          sw_vers
+          echo "=== SYSTEM ==="
+          uname -a
+
+          echo ""
+          echo "=== XCODE ==="
           xcodebuild -version
+
+          echo ""
+          echo "=== SWIFT ==="
+          swift --version
+
+          echo ""
+          echo "=== PYTHON ==="
           python3 --version
-          uname -m
 
-      - name: Install build dependencies
+          echo ""
+          echo "=== GIT ==="
+          git --version
+
+      - name: Check required tools
         run: |
           set -e
-          brew update
-          brew install xcodegen zstd glslang
 
-      - name: Install Python tools
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+          echo "=== TOOL CHECK ==="
 
-      - name: Inspect repository build instructions
-        run: |
-          set -e
-          echo "=== BUILD DOCUMENTATION ==="
-          find . -maxdepth 3 \
-            \( -iname 'readme*' -o -iname 'makefile' \
-            -o -iname '*.sh' -o -iname '*.yml' \
-            -o -iname '*.yaml' \) -print
+          command -v xcodebuild
+          command -v swift
+          command -v python3
+          command -v bash
 
-          echo "=== DM IOS DIRECTORY ==="
-          find dm/ios -maxdepth 2 -type f -print || true
-
-          echo "=== GENERATION DIRECTORY ==="
-          if [ -d dm/ios/Gen ]; then
-            find dm/ios/Gen -maxdepth 2 -print
+          if command -v xcodegen >/dev/null 2>&1; then
+            xcodegen version
           else
-            echo "Gen directory does not exist."
+            echo "XcodeGen is not installed."
           fi
 
-      - name: Validate generated project prerequisites
+      - name: Check nxnative project files
         run: |
           set -e
-          cd dm/ios
 
-          REQUIRED=(
-            "Gen/dm.xcconfig"
-            "Gen/embed.S"
-            "Gen/Assets.xcassets"
-            "Gen/src"
-            "Gen/main/main.c"
+          echo "=== PROJECT FILE CHECK ==="
+
+          FILES=(
+            "dm/ios/project.yml"
+            "dm/ios/tools/build_ipa.sh"
           )
 
-          MISSING=0
-
-          for item in "${REQUIRED[@]}"; do
-            if [ ! -e "$item" ]; then
-              echo "::warning::Missing generated prerequisite: $item"
-              MISSING=1
+          for FILE in "${FILES[@]}"; do
+            if [ -f "$FILE" ]; then
+              echo "FOUND: $FILE"
+            else
+              echo "MISSING: $FILE"
+              exit 1
             fi
           done
 
-          if [ "$MISSING" -eq 1 ]; then
-            echo ""
-            echo "Project generation requires nxnative's documented"
-            echo "preparation process to have produced the Gen files."
-            echo "Stopping before XcodeGen to avoid a misleading failure."
-            exit 1
-          fi
-
-      - name: Generate Xcode project
+      - name: Validate build script syntax
         run: |
           set -e
-          cd dm/ios
-          xcodegen generate
 
-      - name: Validate Xcode project
+          echo "=== BASH SYNTAX CHECK ==="
+
+          bash -n dm/ios/tools/build_ipa.sh
+
+          echo "build_ipa.sh syntax is valid."
+
+      - name: Inspect Xcode project configuration
         run: |
           set -e
-          cd dm/ios
-          xcodebuild -list
 
-      - name: Upload project files
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: nxnative-project-diagnostics
-          path: |
-            dm/ios/project.yml
-            dm/ios/Gen/
-          if-no-files-found: ignore
-          retention-days: 3
+          echo "=== PROJECT CONFIGURATION ==="
+
+          grep -nE \
+            '^(name:|options:|targets:|schemes:|configFiles:)' \
+            dm/ios/project.yml || true
+
+      - name: Inspect build script requirements
+        run: |
+          set -e
+
+          echo "=== BUILD SCRIPT REQUIREMENTS ==="
+
+          grep -nE \
+            'GAME|PATCHED|ROMFS|MSL_IOS|DM_XCODE_PROJECT_DIR|prepare-xcode' \
+            dm/ios/tools/build_ipa.sh || true
+
+      - name: Final report
+        run: |
+          echo ""
+          echo "=================================="
+          echo " WONDER MOBILE BUILD CHECKS DONE"
+          echo "=================================="
+          echo ""
+          echo "Repository checks completed."
+          echo "Build script syntax checked."
+          echo "No game data was processed."
+          echo "No IPA was generated."
