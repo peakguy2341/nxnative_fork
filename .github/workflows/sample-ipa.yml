@@ -1,4 +1,4 @@
-name: Wonder Sample IPA Build
+name: Wonder iOS IPA Build
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   build:
-    name: Build Sample iOS IPA
+    name: Build Wonder iOS IPA
     runs-on: xcode-27
     timeout-minutes: 30
 
@@ -19,89 +19,422 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Create sample app
+      - name: Create Wonder app
+        shell: bash
         run: |
+          set -e
+
           mkdir -p Sources
+          mkdir -p Assets.xcassets/AppIcon.appiconset
 
           cat > Sources/WonderSampleApp.swift <<'EOF'
           import SwiftUI
 
           @main
-          struct WonderSampleApp: App {
+          struct WonderApp: App {
               var body: some Scene {
                   WindowGroup {
-                      VStack(spacing: 16) {
-                          Image(systemName: "rocket.fill")
-                              .font(.system(size: 55))
-                              .foregroundColor(.blue)
-
-                          Text("Wonder Mobile Build Test")
-                              .font(.title2)
-                              .bold()
-
-                          Text("Your GitHub Actions IPA pipeline works!")
-                              .multilineTextAlignment(.center)
-                      }
-                      .padding()
+                      ContentView()
                   }
+              }
+          }
+
+          struct ContentView: View {
+              @State private var showCartridge = false
+
+              var body: some View {
+                  ZStack {
+                      LinearGradient(
+                          colors: [
+                              Color(red: 0.13, green: 0.06, blue: 0.30),
+                              Color(red: 0.25, green: 0.10, blue: 0.48),
+                              Color(red: 0.10, green: 0.05, blue: 0.24)
+                          ],
+                          startPoint: .topLeading,
+                          endPoint: .bottomTrailing
+                      )
+                      .ignoresSafeArea()
+
+                      if showCartridge {
+                          cartridgeScreen
+                      } else {
+                          welcomeScreen
+                      }
+                  }
+                  .preferredColorScheme(.dark)
+              }
+
+              private var welcomeScreen: some View {
+                  VStack(spacing: 20) {
+                      Text("Wonder")
+                          .font(.system(size: 38, weight: .bold, design: .rounded))
+                          .foregroundStyle(.white)
+
+                      WonderFlower()
+                          .frame(width: 190, height: 190)
+                          .padding(.vertical, 8)
+
+                      Text("Welcome to Wonder")
+                          .font(.system(size: 27, weight: .bold, design: .rounded))
+                          .foregroundStyle(.white)
+                          .multilineTextAlignment(.center)
+
+                      Text("Your adventure starts here.")
+                          .font(.system(size: 16, weight: .medium))
+                          .foregroundStyle(.white.opacity(0.75))
+
+                      Button {
+                          withAnimation(.spring(response: 0.4)) {
+                              showCartridge = true
+                          }
+                      } label: {
+                          Text("Get Started!")
+                              .font(.system(size: 18, weight: .bold))
+                              .foregroundStyle(.white)
+                              .frame(maxWidth: .infinity)
+                              .padding(.vertical, 17)
+                              .background(
+                                  LinearGradient(
+                                      colors: [
+                                          Color(red: 0.20, green: 0.78, blue: 0.42),
+                                          Color(red: 0.08, green: 0.58, blue: 0.30)
+                                      ],
+                                      startPoint: .top,
+                                      endPoint: .bottom
+                                  )
+                              )
+                              .clipShape(RoundedRectangle(cornerRadius: 18))
+                          }
+                          .padding(.top, 12)
+                      }
+                      .padding(.horizontal, 30)
+                  }
+                  .padding(.horizontal, 22)
+              }
+
+              private var cartridgeScreen: some View {
+                  VStack(spacing: 22) {
+                      HStack {
+                          Button {
+                              withAnimation {
+                                  showCartridge = false
+                              }
+                          } label: {
+                              Label("Back", systemImage: "chevron.left")
+                                  .font(.system(size: 16, weight: .semibold))
+                                  .foregroundStyle(.white)
+                          }
+
+                          Spacer()
+                      }
+
+                      Spacer()
+
+                      Text("YOUR GAME")
+                          .font(.system(size: 13, weight: .bold))
+                          .tracking(3)
+                          .foregroundStyle(.white.opacity(0.65))
+
+                      VStack(spacing: 15) {
+                          ZStack {
+                              RoundedRectangle(cornerRadius: 22)
+                                  .fill(
+                                      LinearGradient(
+                                          colors: [
+                                              Color(red: 0.15, green: 0.65, blue: 0.90),
+                                              Color(red: 0.42, green: 0.22, blue: 0.78)
+                                          ],
+                                          startPoint: .topLeading,
+                                          endPoint: .bottomTrailing
+                                      )
+                                  )
+
+                              VStack(spacing: 12) {
+                                  Text("SUPER MARIO BROS.")
+                                      .font(.system(size: 19, weight: .black, design: .rounded))
+                                      .foregroundStyle(.white)
+
+                                  Text("WONDER")
+                                      .font(.system(size: 39, weight: .black, design: .rounded))
+                                      .foregroundStyle(.white)
+
+                                  WonderFlower()
+                                      .frame(width: 115, height: 115)
+
+                                  Text("GAME PREVIEW")
+                                      .font(.system(size: 11, weight: .bold))
+                                      .tracking(2)
+                                      .foregroundStyle(.white.opacity(0.85))
+                              }
+                              .padding(22)
+                          }
+                          .frame(height: 330)
+                          .overlay {
+                              RoundedRectangle(cornerRadius: 22)
+                                  .stroke(.white.opacity(0.35), lineWidth: 2)
+                          }
+                          .shadow(color: .black.opacity(0.3), radius: 18, y: 10)
+
+                          Text("Super Mario Bros. Wonder")
+                              .font(.system(size: 22, weight: .bold, design: .rounded))
+                              .foregroundStyle(.white)
+
+                          Text("Visual cartridge preview")
+                              .font(.system(size: 14))
+                              .foregroundStyle(.white.opacity(0.7))
+                      }
+
+                      Spacer()
+
+                      Text("This is a visual prototype, not a playable game.")
+                          .font(.system(size: 11))
+                          .foregroundStyle(.white.opacity(0.55))
+                          .multilineTextAlignment(.center)
+                  }
+                  .padding(24)
+              }
+          }
+
+          struct WonderFlower: View {
+              private let petalColors: [Color] = [
+                  Color(red: 0.30, green: 0.55, blue: 1.0),
+                  Color(red: 0.68, green: 0.32, blue: 0.95),
+                  Color(red: 0.98, green: 0.38, blue: 0.67),
+                  Color(red: 0.32, green: 0.62, blue: 1.0),
+                  Color(red: 0.72, green: 0.35, blue: 0.95),
+                  Color(red: 0.98, green: 0.42, blue: 0.66),
+                  Color(red: 0.34, green: 0.65, blue: 1.0),
+                  Color(red: 0.72, green: 0.34, blue: 0.94)
+              ]
+
+              var body: some View {
+                  GeometryReader { geometry in
+                      let side = min(geometry.size.width, geometry.size.height)
+
+                      ZStack {
+                          ForEach(0..<8, id: \.self) { index in
+                              Capsule()
+                                  .fill(
+                                      LinearGradient(
+                                          colors: [
+                                              petalColors[index],
+                                              petalColors[index].opacity(0.75)
+                                          ],
+                                          startPoint: .top,
+                                          endPoint: .bottom
+                                      )
+                                  )
+                                  .frame(width: side * 0.29, height: side * 0.49)
+                                  .offset(y: -side * 0.23)
+                                  .rotationEffect(.degrees(Double(index) * 45))
+                          }
+
+                          Circle()
+                              .fill(
+                                  LinearGradient(
+                                      colors: [
+                                          Color(red: 1.0, green: 0.91, blue: 0.28),
+                                          Color(red: 1.0, green: 0.70, blue: 0.12)
+                                      ],
+                                      startPoint: .topLeading,
+                                      endPoint: .bottomTrailing
+                                  )
+                              )
+                              .frame(width: side * 0.48, height: side * 0.48)
+
+                          HStack(spacing: side * 0.105) {
+                              Circle()
+                                  .fill(Color(red: 0.20, green: 0.12, blue: 0.16))
+                                  .frame(width: side * 0.055)
+
+                              Circle()
+                                  .fill(Color(red: 0.20, green: 0.12, blue: 0.16))
+                                  .frame(width: side * 0.055)
+                          }
+                          .offset(y: -side * 0.035)
+
+                          FlowerSmile()
+                              .stroke(
+                                  Color(red: 0.20, green: 0.12, blue: 0.16),
+                                  style: StrokeStyle(lineWidth: side * 0.025, lineCap: .round)
+                              )
+                              .frame(width: side * 0.16, height: side * 0.10)
+                              .offset(y: side * 0.09)
+                      }
+                      .frame(width: geometry.size.width, height: geometry.size.height)
+                  }
+              }
+          }
+
+          struct FlowerSmile: Shape {
+              func path(in rect: CGRect) -> Path {
+                  var path = Path()
+                  path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+                  path.addQuadCurve(
+                      to: CGPoint(x: rect.maxX, y: rect.minY),
+                      control: CGPoint(x: rect.midX, y: rect.maxY)
+                  )
+                  return path
               }
           }
           EOF
 
           cat > project.yml <<'EOF'
-          name: WonderSample
+          name: Wonder
 
           options:
-            bundleIdPrefix: com.example
+            bundleIdPrefix: com.wonder
+
+          settings:
+            base:
+              SWIFT_VERSION: "5.0"
+              IPHONEOS_DEPLOYMENT_TARGET: "15.0"
 
           targets:
-            WonderSample:
+            Wonder:
               type: application
               platform: iOS
               deploymentTarget: "15.0"
               sources:
                 - Sources
+                - Assets.xcassets
               settings:
                 base:
-                  PRODUCT_BUNDLE_IDENTIFIER: com.example.wondersample
-                  PRODUCT_NAME: WonderSample
-                  INFOPLIST_KEY_CFBundleDisplayName: "Wonder Sample"
+                  PRODUCT_BUNDLE_IDENTIFIER: com.wonder.mobile
+                  PRODUCT_NAME: Wonder
+                  INFOPLIST_KEY_CFBundleDisplayName: Wonder
                   GENERATE_INFOPLIST_FILE: YES
-                  SWIFT_VERSION: "5.0"
+                  ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
                   TARGETED_DEVICE_FAMILY: "1,2"
           EOF
+
+      - name: Generate Wonder app icon
+        shell: bash
+        run: |
+          set -e
+
+          cat > make-icon.swift <<'EOF'
+          import AppKit
+
+          let size = 1024
+          let image = NSImage(size: NSSize(width: size, height: size))
+
+          image.lockFocus()
+
+          let bounds = NSRect(x: 0, y: 0, width: size, height: size)
+
+          let background = NSGradient(colors: [
+              NSColor(calibratedRed: 0.12, green: 0.05, blue: 0.30, alpha: 1),
+              NSColor(calibratedRed: 0.32, green: 0.12, blue: 0.58, alpha: 1)
+          ])!
+          background.draw(in: bounds, angle: 45)
+
+          let colors: [NSColor] = [
+              .systemBlue, .systemPurple, .systemPink, .systemBlue,
+              .systemPurple, .systemPink, .systemBlue, .systemPurple
+          ]
+
+          for index in 0..<8 {
+              let petal = NSBezierPath(ovalIn: NSRect(
+                  x: 392, y: 590, width: 240, height: 390
+              ))
+
+              let transform = NSAffineTransform()
+              transform.translateX(by: 512, yBy: 512)
+              transform.rotate(byDegrees: CGFloat(index) * 45)
+              transform.translateX(by: -512, yBy: -512)
+              petal.transform(using: transform)
+
+              colors[index].setFill()
+              petal.fill()
+          }
+
+          NSColor(calibratedRed: 1, green: 0.83, blue: 0.20, alpha: 1).setFill()
+          NSBezierPath(ovalIn: NSRect(x: 320, y: 320, width: 384, height: 384)).fill()
+
+          NSColor(calibratedRed: 0.20, green: 0.12, blue: 0.16, alpha: 1).setFill()
+          NSBezierPath(ovalIn: NSRect(x: 420, y: 515, width: 46, height: 68)).fill()
+          NSBezierPath(ovalIn: NSRect(x: 558, y: 515, width: 46, height: 68)).fill()
+
+          let smile = NSBezierPath()
+          smile.move(to: NSPoint(x: 445, y: 455))
+          smile.curve(to: NSPoint(x: 579, y: 455),
+                      controlPoint1: NSPoint(x: 475, y: 385),
+                      controlPoint2: NSPoint(x: 549, y: 385))
+          smile.lineWidth = 16
+          smile.lineCapStyle = .round
+          smile.stroke()
+
+          image.unlockFocus()
+
+          let rep = NSBitmapImageRep(data: image.tiffRepresentation!)!
+          let png = rep.representation(using: .png, properties: [:])!
+          try png.write(to: URL(fileURLWithPath: "Assets.xcassets/AppIcon.appiconset/AppIcon.png"))
+          EOF
+
+          swift make-icon.swift
+
+          cat > Assets.xcassets/AppIcon.appiconset/Contents.json <<'EOF'
+          {
+            "images": [
+              {
+                "filename": "AppIcon.png",
+                "idiom": "universal",
+                "platform": "ios",
+                "size": "1024x1024"
+              }
+            ],
+            "info": {
+              "author": "xcode",
+              "version": 1
+            }
+          }
+          EOF
+
+          test -s Assets.xcassets/AppIcon.appiconset/AppIcon.png
 
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Build iOS app
+      - name: Build Wonder
         run: |
+          set -e
+
           xcodebuild \
-            -project WonderSample.xcodeproj \
-            -scheme WonderSample \
+            -project Wonder.xcodeproj \
+            -scheme Wonder \
             -sdk iphoneos \
             -configuration Release \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             build
 
-      - name: Package unsigned IPA
+      - name: Package Wonder IPA
+        shell: bash
         run: |
-          APP="build/Build/Products/Release-iphoneos/WonderSample.app"
+          set -e
+
+          APP="build/Build/Products/Release-iphoneos/Wonder.app"
 
           test -d "$APP"
 
-          mkdir Payload
+          /usr/libexec/PlistBuddy \
+            -c "Print :CFBundleDisplayName" \
+            "$APP/Info.plist"
+
+          mkdir -p Payload
           cp -R "$APP" Payload/
 
           ditto -c -k --sequesterRsrc --keepParent \
-            Payload Wonder-Sample-Unsigned.ipa
+            Payload Wonder.ipa
 
-          test -s Wonder-Sample-Unsigned.ipa
+          test -s Wonder.ipa
+          unzip -t Wonder.ipa
 
-      - name: Upload sample IPA
+      - name: Upload Wonder IPA
         uses: actions/upload-artifact@v4
         with:
           name: Wonder-Sample-Unsigned-IPA
-          path: Wonder-Sample-Unsigned.ipa
+          path: Wonder.ipa
+          if-no-files-found: error
           retention-days: 7
